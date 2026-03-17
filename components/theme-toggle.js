@@ -10,6 +10,7 @@ const MODE_STORAGE_KEY = "grocery-mode";
 const THEME_EVENT = "grocery-theme-change";
 const THEME_BLAST_EVENT = "grocery-theme-blast";
 const SERVER_SNAPSHOT = "classic::light";
+const THEME_SWAP_DELAY_MS = 380;
 
 function getStoredTheme() {
   if (typeof window === "undefined") {
@@ -56,20 +57,24 @@ function subscribe(callback) {
 
 function applyTheme(theme, mode) {
   const body = document.body;
-  const resolvedMode =
-    mode === "system"
-      ? window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : mode;
+  const resolvedMode = resolveMode(mode);
 
   Object.values(appThemes).forEach(({ bodyClassName }) => body.classList.remove(bodyClassName));
   body.classList.add(appThemes[theme].bodyClassName);
   body.dataset.mode = resolvedMode;
 }
 
+function resolveMode(mode) {
+  return mode === "system"
+    ? window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light"
+    : mode;
+}
+
 export function ThemeToggle() {
   const rootRef = useRef(null);
+  const swapTimerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [theme, mode] = snapshot.split("::");
@@ -77,6 +82,14 @@ export function ThemeToggle() {
   useEffect(() => {
     applyTheme(theme, mode);
   }, [theme, mode]);
+
+  useEffect(() => {
+    return () => {
+      if (swapTimerRef.current) {
+        window.clearTimeout(swapTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -114,22 +127,39 @@ export function ThemeToggle() {
     window.dispatchEvent(new Event(THEME_EVENT));
   }
 
-  function triggerBlast() {
+  function triggerBlast(nextTheme, nextMode) {
     const rect = rootRef.current?.getBoundingClientRect();
+    const resolvedMode = resolveMode(nextMode);
+    const blastColors = appThemes[nextTheme]?.blast?.[resolvedMode] || appThemes.classic.blast.light;
+
     window.dispatchEvent(
       new CustomEvent(THEME_BLAST_EVENT, {
         detail: {
           x: rect ? rect.left + rect.width / 2 : window.innerWidth / 2,
           y: rect ? rect.top + rect.height / 2 : 48,
+          fill: blastColors.fill,
+          ring: blastColors.ring,
         },
       }),
     );
   }
 
-  function choose(action) {
-    triggerBlast();
-    action();
+  function choose({ nextTheme = theme, nextMode = mode, apply }) {
+    if (nextTheme === theme && nextMode === mode) {
+      setOpen(false);
+      return;
+    }
+
+    if (swapTimerRef.current) {
+      window.clearTimeout(swapTimerRef.current);
+    }
+
+    triggerBlast(nextTheme, nextMode);
     setOpen(false);
+    swapTimerRef.current = window.setTimeout(() => {
+      apply();
+      swapTimerRef.current = null;
+    }, THEME_SWAP_DELAY_MS);
   }
 
   return (
@@ -153,7 +183,7 @@ export function ThemeToggle() {
           <p className="app-theme-menu-section">Mode</p>
           <button
             type="button"
-            onClick={() => choose(() => handleModeChange("system"))}
+            onClick={() => choose({ nextMode: "system", apply: () => handleModeChange("system") })}
             className="app-theme-menu-item"
             data-active={mode === "system"}
             role="menuitemradio"
@@ -164,7 +194,7 @@ export function ThemeToggle() {
           </button>
           <button
             type="button"
-            onClick={() => choose(() => handleModeChange("light"))}
+            onClick={() => choose({ nextMode: "light", apply: () => handleModeChange("light") })}
             className="app-theme-menu-item"
             data-active={mode === "light"}
             role="menuitemradio"
@@ -175,7 +205,7 @@ export function ThemeToggle() {
           </button>
           <button
             type="button"
-            onClick={() => choose(() => handleModeChange("dark"))}
+            onClick={() => choose({ nextMode: "dark", apply: () => handleModeChange("dark") })}
             className="app-theme-menu-item"
             data-active={mode === "dark"}
             role="menuitemradio"
@@ -192,7 +222,7 @@ export function ThemeToggle() {
             <button
               key={key}
               type="button"
-              onClick={() => choose(() => handleThemeChange(key))}
+              onClick={() => choose({ nextTheme: key, apply: () => handleThemeChange(key) })}
               className="app-theme-menu-item"
               data-active={theme === key}
               role="menuitemradio"

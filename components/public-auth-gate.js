@@ -561,7 +561,7 @@ export function PublicAuthGate() {
                   </div>
                 </EntranceMotion>
 
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {products.map((product, index) => (
                     <EntranceMotion key={product.id} delay={0.24 + index * 0.04}>
                       <PublicProductCard product={product} onRequireLogin={openClientLogin} />

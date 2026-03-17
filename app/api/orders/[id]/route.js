@@ -17,25 +17,33 @@ export async function PATCH(request, { params }) {
   const body = await request.json();
   const { id } = await params;
 
-  const updated = await prisma.order.update({
-    where: {
-      id,
-    },
-    data: {
-      ...(body.status ? { status: mapStatus(body.status) } : {}),
-      ...(body.trackingNumber !== undefined ? { trackingNumber: body.trackingNumber || null } : {}),
-      ...(body.trackingCarrier !== undefined ? { trackingCarrier: body.trackingCarrier || null } : {}),
-      ...(body.trackingStatus !== undefined ? { trackingStatus: body.trackingStatus || null } : {}),
-      ...(body.trackingNumber !== undefined || body.trackingCarrier !== undefined || body.trackingStatus !== undefined
-        ? { trackingUpdatedAt: new Date() }
-        : {}),
-    },
-    include: {
-      lines: true,
-    },
-  });
+  try {
+    const updated = await prisma.order.update({
+      where: {
+        id,
+      },
+      data: {
+        ...(body.status ? { status: mapStatus(body.status) } : {}),
+        ...(body.trackingNumber !== undefined ? { trackingNumber: body.trackingNumber || null } : {}),
+        ...(body.trackingCarrier !== undefined ? { trackingCarrier: body.trackingCarrier || null } : {}),
+        ...(body.trackingStatus !== undefined ? { trackingStatus: body.trackingStatus || null } : {}),
+        ...(body.trackingNumber !== undefined || body.trackingCarrier !== undefined || body.trackingStatus !== undefined
+          ? { trackingUpdatedAt: new Date() }
+          : {}),
+      },
+      include: {
+        lines: true,
+      },
+    });
 
-  return ok({
-    data: serializeOrder(updated),
-  });
+    return ok({
+      data: serializeOrder(updated),
+    });
+  } catch (error) {
+    if (error?.code === "P2025") {
+      return fail("Order not found.", 404);
+    }
+
+    throw error;
+  }
 }

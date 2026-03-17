@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { fallbackProducts } from "@/lib/fallback-data";
 
@@ -142,8 +143,13 @@ function normalizeOrderTotals(order) {
   };
 }
 
+function isLocalOnlyId(id) {
+  return /^(ORD-|SUP-|COUPON-)/.test(String(id || ""));
+}
+
 export function AppStoreProvider({ children }) {
   const [state, setState] = useState(createInitialState);
+  const pathname = usePathname();
 
   async function readJson(endpoint, fallback) {
     try {
@@ -155,6 +161,19 @@ export function AppStoreProvider({ children }) {
       return data.data;
     } catch {
       return fallback;
+    }
+  }
+
+  async function readCurrentUser() {
+    try {
+      const response = await fetch("/api/auth/me", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.user) {
+        return null;
+      }
+      return data.user;
+    } catch {
+      return null;
     }
   }
 
@@ -173,12 +192,13 @@ export function AppStoreProvider({ children }) {
 
     async function syncStore() {
       try {
+        const user = await readCurrentUser();
         const [products, favorites, orders, coupons, supportTickets] = await Promise.all([
           readJson("/api/products", fallbackProducts),
           readJson("/api/favorites", []),
-          readJson("/api/orders", createInitialState().orders),
+          user ? readJson("/api/orders", []) : [],
           readJson("/api/coupons", createInitialState().coupons),
-          readJson("/api/support", createInitialState().supportTickets),
+          user ? readJson("/api/support", []) : [],
         ]);
 
         if (!active) {
@@ -203,7 +223,7 @@ export function AppStoreProvider({ children }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -618,6 +638,31 @@ export function AppStoreProvider({ children }) {
           });
       },
       replySupport(ticketId, message, authorEmail, authorRole) {
+        if (isLocalOnlyId(ticketId)) {
+          patch((current) => ({
+            ...current,
+            supportTickets: current.supportTickets.map((ticket) =>
+              ticket.id === ticketId
+                ? {
+                    ...ticket,
+                    status: authorRole === "ADMIN" ? "answered" : "open",
+                    messages: [
+                      ...ticket.messages,
+                      {
+                        id: `SUP-MSG-${Date.now()}`,
+                        authorRole,
+                        authorEmail,
+                        message,
+                        createdAt: new Date().toISOString(),
+                      },
+                    ],
+                  }
+                : ticket,
+            ),
+          }));
+          return;
+        }
+
         fetch(`/api/support/${ticketId}/messages`, {
           method: "POST",
           headers: {
@@ -660,6 +705,16 @@ export function AppStoreProvider({ children }) {
           });
       },
       closeSupport(ticketId) {
+        if (isLocalOnlyId(ticketId)) {
+          patch((current) => ({
+            ...current,
+            supportTickets: current.supportTickets.map((ticket) =>
+              ticket.id === ticketId ? { ...ticket, status: "closed" } : ticket,
+            ),
+          }));
+          return;
+        }
+
         fetch(`/api/support/${ticketId}/close`, { method: "PATCH" })
           .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
           .then(({ ok, data }) => {
@@ -795,6 +850,16 @@ export function AppStoreProvider({ children }) {
         await syncPatchedProduct(productId, { stock: product.stock + amount });
       },
       updateOrder(orderId, changes) {
+        if (isLocalOnlyId(orderId)) {
+          patch((current) => ({
+            ...current,
+            orders: current.orders.map((order) =>
+              order.id === orderId ? normalizeOrderTotals({ ...order, ...changes }) : order,
+            ),
+          }));
+          return;
+        }
+
         fetch(`/api/orders/${orderId}`, {
           method: "PATCH",
           headers: {
@@ -856,6 +921,13 @@ export function AppStoreProvider({ children }) {
       toggleCoupon(id) {
         const coupon = state.coupons.find((entry) => entry.id === id);
         if (!coupon) {
+          return;
+        }
+        if (isLocalOnlyId(id)) {
+          patch((current) => ({
+            ...current,
+            coupons: current.coupons.map((entry) => (entry.id === id ? { ...entry, isActive: !entry.isActive } : entry)),
+          }));
           return;
         }
         fetch(`/api/coupons/${id}`, {

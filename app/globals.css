@@ -207,11 +207,14 @@ img {
 }
 
 .app-shell {
-  margin-inline: auto;
   min-height: 100vh;
   width: 100%;
-  max-width: 72rem;
-  padding: 1.5rem 1.25rem 7rem;
+  max-width: none;
+  padding:
+    1rem
+    max(1rem, env(safe-area-inset-right))
+    calc(6.5rem + env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
 }
 
 .app-bar {
@@ -402,12 +405,13 @@ img {
 
 @media (min-width: 640px) {
   .app-shell {
-    padding-inline: 2rem;
+    padding-top: 1.25rem;
+    padding-inline: clamp(1.25rem, 2.6vw, 2rem);
   }
 }
 
 @media (min-width: 1024px) {
   .app-shell {
-    padding-inline: 2.5rem;
+    padding-inline: clamp(1.75rem, 2.8vw, 3rem);
   }
 }

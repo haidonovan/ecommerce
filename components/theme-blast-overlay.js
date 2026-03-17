@@ -12,7 +12,7 @@ export function ThemeBlastOverlay() {
 
   useEffect(() => {
     function handleBlast(event) {
-      const { x = window.innerWidth / 2, y = 48 } = event.detail || {};
+      const { x = window.innerWidth / 2, y = 48, fill = "#d9eee9", ring = "#127c73" } = event.detail || {};
       const maxRadius = Math.hypot(
         Math.max(x, window.innerWidth - x),
         Math.max(y, window.innerHeight - y),
@@ -23,6 +23,8 @@ export function ThemeBlastOverlay() {
         x,
         y,
         size: maxRadius * 2.15,
+        fill,
+        ring,
       });
     }
 
@@ -38,7 +40,7 @@ export function ThemeBlastOverlay() {
       {blast ? (
         <div key={blast.id} className="pointer-events-none fixed inset-0 z-[90] overflow-hidden">
           <motion.div
-            className="absolute rounded-full border border-white/20 bg-[color:color-mix(in_srgb,var(--action)_28%,white)]"
+            className="absolute rounded-full border"
             style={{
               left: blast.x,
               top: blast.y,
@@ -46,15 +48,17 @@ export function ThemeBlastOverlay() {
               height: blast.size,
               marginLeft: -(blast.size / 2),
               marginTop: -(blast.size / 2),
+              backgroundColor: blast.fill,
+              borderColor: "rgba(255,255,255,0.2)",
             }}
             initial={{ scale: 0, opacity: 0.96 }}
             animate={{ scale: 1, opacity: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.74, ease: easeInOutCubic }}
+            transition={{ duration: 0.9, ease: easeInOutCubic }}
             onAnimationComplete={() => setBlast(null)}
           />
           <motion.div
-            className="absolute rounded-full border-[10px] border-white/25"
+            className="absolute rounded-full border-[10px]"
             style={{
               left: blast.x,
               top: blast.y,
@@ -62,11 +66,12 @@ export function ThemeBlastOverlay() {
               height: blast.size * 0.9,
               marginLeft: -(blast.size * 0.45),
               marginTop: -(blast.size * 0.45),
+              borderColor: blast.ring,
             }}
             initial={{ scale: 0, opacity: 0.55 }}
             animate={{ scale: 1.08, opacity: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.68, ease: easeInOutCubic }}
+            transition={{ duration: 0.82, ease: easeInOutCubic }}
           />
         </div>
       ) : null}

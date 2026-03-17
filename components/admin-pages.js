@@ -412,7 +412,7 @@ export function AdminDashboardPageView() {
   return (
     <>
       <div className="space-y-6">
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {metrics.map((metric, index) => (
             <EntranceMotion key={metric.label} delay={0.08 + index * 0.06}>
               <HoverLift hoverOffset={5} hoverScale={1.01} hoverElevation={20} normalElevation={8}>
@@ -567,7 +567,7 @@ export function AdminDashboardPageView() {
                 </div>
               </header>
               <div className="h-[calc(100vh-5.5rem)] overflow-auto px-4 py-5 sm:px-6">
-                <div className="mx-auto max-w-6xl">
+                <div className="w-full">
                   {expandedChart === "revenue" ? (
                     <Card>
                       <RevenueChart points={revenueSeries} height={360} />

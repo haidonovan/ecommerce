@@ -172,7 +172,7 @@ export function ClientShell({ user, initialTab = "shop" }) {
         </AnimatePresence>
       </div>
 
-      <nav className="app-nav-surface fixed bottom-4 left-1/2 z-30 hidden w-[min(92vw,38rem)] -translate-x-1/2 items-center justify-between p-2 md:flex">
+      <nav className="app-nav-surface fixed bottom-4 left-4 right-4 z-30 hidden items-center justify-between p-2 md:flex lg:left-6 lg:right-6">
         {clientTabs.map((tab) => (
           <button
             key={tab.key}
