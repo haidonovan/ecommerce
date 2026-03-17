@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 
-import { PublicAuthGate } from "@/components/public-auth-gate";
 import { getCurrentUser } from "@/lib/auth";
 
-export default async function Home() {
+export default async function LoginPage() {
   const user = await getCurrentUser();
 
   if (user?.role === "ADMIN") {
@@ -14,5 +13,5 @@ export default async function Home() {
     redirect("/client");
   }
 
-  return <PublicAuthGate />;
+  redirect("/?auth=login");
 }
