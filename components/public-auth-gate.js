@@ -25,6 +25,38 @@ function getDiscountedPrice(product) {
   return product.price * (1 - product.discountPercent / 100);
 }
 
+const PUBLIC_DESKTOP_COLUMNS = 3;
+const PUBLIC_DEFAULT_ROWS = 3;
+const PUBLIC_SHOW_MORE_ROWS = 3;
+const PUBLIC_INITIAL_VISIBLE_PRODUCTS = PUBLIC_DESKTOP_COLUMNS * PUBLIC_DEFAULT_ROWS;
+const PUBLIC_SHOW_MORE_INCREMENT = PUBLIC_DESKTOP_COLUMNS * PUBLIC_SHOW_MORE_ROWS;
+const PUBLIC_SORT_OPTIONS = [
+  "Featured",
+  "Price: Low to High",
+  "Price: High to Low",
+  "Stock",
+  "Name",
+  "Biggest discount",
+];
+const PUBLIC_PRICE_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "under-15", label: "Under $15" },
+  { value: "15-30", label: "$15-$30" },
+  { value: "30-plus", label: "$30+" },
+];
+const PUBLIC_QUICK_FILTER_OPTIONS = [
+  { id: "inStock", label: "In stock" },
+  { id: "onSale", label: "On sale" },
+  { id: "topRated", label: "Rating 4.7+" },
+  { id: "bulkBuy", label: "Stock 20+" },
+];
+const INITIAL_PUBLIC_QUICK_FILTERS = {
+  inStock: false,
+  onSale: false,
+  topRated: false,
+  bulkBuy: false,
+};
+
 function SurfaceCard({ children, className = "" }) {
   return (
     <div
@@ -78,7 +110,7 @@ function PublicProductCard({ product, onRequireLogin }) {
 
   return (
     <HoverLift hoverOffset={5} hoverScale={1.006} hoverElevation={20} normalElevation={8}>
-      <article className="public-home-product-card overflow-hidden rounded-[1.45rem] shadow-[0_16px_38px_rgba(3,10,18,0.22)]">
+      <article className="public-home-product-card flex h-full flex-col overflow-hidden rounded-[1.45rem] shadow-[0_16px_38px_rgba(3,10,18,0.22)]">
         <div
           role="button"
           tabIndex={0}
@@ -112,9 +144,14 @@ function PublicProductCard({ product, onRequireLogin }) {
           </div>
         </div>
 
-        <div className="space-y-3 px-3.5 pb-3.5 pt-3">
+        <div className="flex flex-1 flex-col gap-2.5 px-3.5 pb-3.5 pt-3">
           <div>
-            <h3 className="line-clamp-2 text-[0.98rem] font-semibold leading-5 text-[var(--public-home-product-foreground)]">{product.name}</h3>
+            <h3
+              className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.98rem] font-semibold leading-5 text-[var(--public-home-product-foreground)]"
+              title={product.name}
+            >
+              {product.name}
+            </h3>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
@@ -134,7 +171,7 @@ function PublicProductCard({ product, onRequireLogin }) {
           </p>
 
           <Button
-            className="w-full rounded-[0.95rem] border border-[color-mix(in_srgb,var(--action)_36%,transparent)] bg-[var(--action)] py-2.5 text-[var(--action-foreground)] shadow-none hover:brightness-[1.01]"
+            className="mt-auto w-full rounded-[0.95rem] border border-[color-mix(in_srgb,var(--action)_36%,transparent)] bg-[var(--action)] py-2.5 text-[var(--action-foreground)] shadow-none hover:brightness-[1.01]"
             onClick={() => onRequireLogin("Login to add items to cart.")}
           >
             {product.stock > 0 ? "Add to cart" : "Out of stock"}
@@ -558,47 +595,95 @@ export function PublicAuthGate() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [categorySearch, setCategorySearch] = useState("");
   const [sort, setSort] = useState("Featured");
+  const [priceFilter, setPriceFilter] = useState("all");
+  const [quickFilters, setQuickFilters] = useState(INITIAL_PUBLIC_QUICK_FILTERS);
   const [showRegister, setShowRegister] = useState(false);
   const [roleTab, setRoleTab] = useState("client");
   const [showPublicShop, setShowPublicShop] = useState(true);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [visibleGridCounts, setVisibleGridCounts] = useState({});
 
-  const categories = useMemo(() => ["All", ...new Set(store.activeProducts.map((product) => product.category))], [store.activeProducts]);
+  const categories = useMemo(() => [...new Set(store.activeProducts.map((product) => product.category))], [store.activeProducts]);
+  const categoryChips = useMemo(() => ["All", ...categories], [categories]);
+  const visibleCategoryOptions = useMemo(() => {
+    const lower = categorySearch.trim().toLowerCase();
+    if (!lower) {
+      return categories;
+    }
+    return categories.filter((category) => category.toLowerCase().includes(lower));
+  }, [categories, categorySearch]);
 
   const products = useMemo(() => {
     const lower = query.trim().toLowerCase();
     const filtered = store.activeProducts.filter((product) => {
-      if (selectedCategory !== "All" && product.category !== selectedCategory) {
+      const discountedPrice = getDiscountedPrice(product);
+
+      if (selectedCategories.length > 0 && !selectedCategories.includes(product.category)) {
         return false;
       }
-      if (!lower) {
-        return true;
+      if (lower && ![product.name, product.description, product.category].some((value) => value.toLowerCase().includes(lower))) {
+        return false;
       }
-      return [product.name, product.description, product.category].some((value) => value.toLowerCase().includes(lower));
+
+      if (quickFilters.inStock && product.stock <= 0) {
+        return false;
+      }
+      if (quickFilters.onSale && product.discountPercent <= 0) {
+        return false;
+      }
+      if (quickFilters.topRated && (product.rating || 0) < 4.7) {
+        return false;
+      }
+      if (quickFilters.bulkBuy && product.stock < 20) {
+        return false;
+      }
+
+      switch (priceFilter) {
+        case "under-15":
+          if (discountedPrice >= 15) {
+            return false;
+          }
+          break;
+        case "15-30":
+          if (discountedPrice < 15 || discountedPrice > 30) {
+            return false;
+          }
+          break;
+        case "30-plus":
+          if (discountedPrice < 30) {
+            return false;
+          }
+          break;
+        default:
+          break;
+      }
+
+      return true;
     });
 
+    const sorted = [...filtered];
     switch (sort) {
       case "Price: Low to High":
-        return filtered.sort((a, b) => a.price * (1 - a.discountPercent / 100) - b.price * (1 - b.discountPercent / 100));
+        return sorted.sort((a, b) => a.price * (1 - a.discountPercent / 100) - b.price * (1 - b.discountPercent / 100));
       case "Price: High to Low":
-        return filtered.sort((a, b) => b.price * (1 - b.discountPercent / 100) - a.price * (1 - a.discountPercent / 100));
+        return sorted.sort((a, b) => b.price * (1 - b.discountPercent / 100) - a.price * (1 - a.discountPercent / 100));
       case "Stock":
-        return filtered.sort((a, b) => b.stock - a.stock);
+        return sorted.sort((a, b) => b.stock - a.stock);
       case "Name":
-        return filtered.sort((a, b) => a.name.localeCompare(b.name));
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case "Biggest discount":
+        return sorted.sort((a, b) => b.discountPercent - a.discountPercent);
       default:
-        return filtered.sort((a, b) => b.rating - a.rating);
+        return sorted.sort((a, b) => b.rating - a.rating);
     }
-  }, [store.activeProducts, query, selectedCategory, sort]);
+  }, [priceFilter, query, quickFilters, selectedCategories, sort, store.activeProducts]);
 
   const groupedProducts = useMemo(() => {
-    const visibleCategories =
-      selectedCategory === "All"
-        ? categories.filter((category) => category !== "All")
-        : [selectedCategory];
+    const visibleCategories = selectedCategories.length ? selectedCategories : categories;
 
     return visibleCategories
       .map((category) => ({
@@ -606,7 +691,28 @@ export function PublicAuthGate() {
         products: products.filter((product) => product.category === category),
       }))
       .filter((group) => group.products.length);
-  }, [categories, products, selectedCategory]);
+  }, [categories, products, selectedCategories]);
+
+  const activeFilterCount = useMemo(
+    () =>
+      selectedCategories.length +
+      Object.values(quickFilters).filter(Boolean).length +
+      (priceFilter !== "all" ? 1 : 0) +
+      (query ? 1 : 0),
+    [priceFilter, query, quickFilters, selectedCategories],
+  );
+
+  useEffect(() => {
+    setVisibleGridCounts((current) => {
+      const next = {};
+
+      for (const group of groupedProducts) {
+        next[group.category] = current[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS;
+      }
+
+      return next;
+    });
+  }, [groupedProducts]);
 
   useEffect(() => {
     const authView = searchParams.get("auth");
@@ -647,6 +753,45 @@ export function PublicAuthGate() {
     setShowPublicShop(false);
     setNotice(nextNotice);
     syncAuthView("login");
+  }
+
+  function chooseQuickCategory(category) {
+    if (category === "All") {
+      setSelectedCategories([]);
+      return;
+    }
+    setSelectedCategories([category]);
+  }
+
+  function toggleSidebarCategory(category) {
+    setSelectedCategories((current) =>
+      current.includes(category)
+        ? current.filter((entry) => entry !== category)
+        : [...current, category],
+    );
+  }
+
+  function toggleQuickFilter(filterId) {
+    setQuickFilters((current) => ({
+      ...current,
+      [filterId]: !current[filterId],
+    }));
+  }
+
+  function resetFilters() {
+    setQuery("");
+    setCategorySearch("");
+    setSelectedCategories([]);
+    setPriceFilter("all");
+    setQuickFilters(INITIAL_PUBLIC_QUICK_FILTERS);
+    setSort("Featured");
+  }
+
+  function showMoreProducts(category) {
+    setVisibleGridCounts((current) => ({
+      ...current,
+      [category]: (current[category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS) + PUBLIC_SHOW_MORE_INCREMENT,
+    }));
   }
 
   async function submitAuth(endpoint, payload, redirectTo) {
@@ -692,26 +837,26 @@ export function PublicAuthGate() {
           transition={{ duration: 0.48, ease: easeInOutCubic }}
         >
           {showingPublicShop ? (
-            <section className="public-home-screen w-full overflow-hidden border border-transparent shadow-[0_30px_80px_rgba(2,10,18,0.12)]">
+            <section className="public-home-screen w-full overflow-hidden">
               <div className="relative isolate overflow-hidden">
                 <div className="pointer-events-none absolute -right-14 top-12 h-44 w-44 rounded-full bg-[color-mix(in_srgb,var(--action)_22%,transparent)] blur-2xl" />
                 <div className="pointer-events-none absolute -left-18 bottom-[-5rem] h-52 w-52 rounded-full bg-[color-mix(in_srgb,var(--accent-secondary)_38%,transparent)] blur-2xl" />
-
-                <header className="relative z-[70] px-4 pb-2.5 pt-3.5 sm:px-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <h1 className="text-[1.3rem] font-semibold tracking-[-0.03em] text-[var(--foreground)] sm:text-[1.42rem]">Shop</h1>
-                    <div className="flex items-center gap-2">
-                      <div className="relative z-[80] origin-center scale-[0.92] sm:scale-[0.96]">
-                        <ThemeToggle />
+                <div className="relative z-[1] mx-auto w-full max-w-[72rem] px-4 pb-6 pt-3.5 sm:px-5 sm:pb-8 lg:px-6">
+                  <header className="relative z-[70] pb-2.5">
+                    <div className="flex items-center justify-between gap-4">
+                      <h1 className="text-[1.3rem] font-semibold tracking-[-0.03em] text-[var(--foreground)] sm:text-[1.42rem]">Shop</h1>
+                      <div className="flex items-center gap-2">
+                        <div className="relative z-[80] origin-center scale-[0.92] sm:scale-[0.96]">
+                          <ThemeToggle />
+                        </div>
+                        <button type="button" onClick={() => openClientLogin("")} className="app-link-button !px-2.5 !py-1.5 text-[0.92rem] text-[var(--foreground)]">
+                          Login
+                        </button>
                       </div>
-                      <button type="button" onClick={() => openClientLogin("")} className="app-link-button !px-2.5 !py-1.5 text-[0.92rem] text-[var(--foreground)]">
-                        Login
-                      </button>
                     </div>
-                  </div>
-                </header>
+                  </header>
 
-                <div className="space-y-4 px-4 pb-6 sm:px-5 sm:pb-8">
+                  <div className="space-y-4">
                   <EntranceMotion delay={0.08}>
                     <div className="public-home-banner relative overflow-hidden rounded-[0.2rem] px-3.5 py-2.5 shadow-[0_12px_28px_rgba(2,10,18,0.16)] sm:px-4 sm:py-3">
                       <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-32 rounded-full bg-[color-mix(in_srgb,var(--action)_18%,transparent)]" />
@@ -739,82 +884,228 @@ export function PublicAuthGate() {
                   {notice ? <AuthNotice>{notice}</AuthNotice> : null}
 
                   <EntranceMotion delay={0.16}>
-                    <div className="space-y-3">
-                      <div className="public-home-search-shell rounded-[1.1rem] p-1.5 shadow-[0_8px_22px_rgba(3,10,18,0.12)]">
-                        <label className="flex items-center gap-3 rounded-[1.05rem] px-4 py-3">
-                          <Search className="size-5 text-[var(--action)]" />
-                          <input
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search products, categories, deals"
-                            className="w-full bg-transparent text-[1rem] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none"
-                          />
-                        </label>
-                      </div>
+                    <div className="lg:grid lg:grid-cols-[17.75rem_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[18.5rem_minmax(0,1fr)]">
+                      <aside className="hidden lg:block">
+                        <div className="sticky top-6 rounded-[1.6rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_92%,var(--background-start))] p-5 shadow-[var(--shadow-soft)]">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <h2 className="text-[1.4rem] font-semibold text-[var(--foreground)]">Filters</h2>
+                              <p className="mt-1 text-sm text-[var(--muted-foreground)]">{products.length} grocery items</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={resetFilters}
+                              className="text-sm font-medium text-[var(--action)]"
+                            >
+                              Reset
+                            </button>
+                          </div>
 
-                      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                        {categories.map((category) => (
-                          <button
-                            key={category}
-                            type="button"
-                            onClick={() => setSelectedCategory(category)}
-                            className={cn(
-                              "public-home-chip inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
-                              selectedCategory === category
-                                ? "text-[var(--foreground)]"
-                                : "text-[var(--foreground)]",
-                            )}
-                            data-active={selectedCategory === category}
+                          <div className="mt-6 space-y-6">
+                            <section className="space-y-3">
+                              <h3 className="text-sm font-semibold text-[var(--foreground)]">Sort by</h3>
+                              <div className="space-y-2">
+                                {PUBLIC_SORT_OPTIONS.map((option) => (
+                                  <label key={option} className="flex cursor-pointer items-center gap-3 text-sm text-[var(--foreground)]">
+                                    <input
+                                      type="radio"
+                                      name="desktop-sort"
+                                      checked={sort === option}
+                                      onChange={() => setSort(option)}
+                                      className="size-4 accent-[var(--action)]"
+                                    />
+                                    <span>{option}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </section>
+
+                            <section className="space-y-3">
+                              <h3 className="text-sm font-semibold text-[var(--foreground)]">Quick filters</h3>
+                              <div className="flex flex-wrap gap-2">
+                                {PUBLIC_QUICK_FILTER_OPTIONS.map((filter) => (
+                                  <button
+                                    key={filter.id}
+                                    type="button"
+                                    onClick={() => toggleQuickFilter(filter.id)}
+                                    className={cn(
+                                      "rounded-full border px-3.5 py-2 text-sm transition",
+                                      quickFilters[filter.id]
+                                        ? "border-transparent bg-[color-mix(in_srgb,var(--action)_16%,var(--surface))] text-[var(--foreground)]"
+                                        : "border-[var(--border-soft)] bg-[var(--surface)] text-[var(--foreground)]",
+                                    )}
+                                  >
+                                    {filter.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </section>
+
+                            <section className="space-y-3">
+                              <h3 className="text-sm font-semibold text-[var(--foreground)]">Price</h3>
+                              <div className="grid grid-cols-2 gap-2">
+                                {PUBLIC_PRICE_OPTIONS.map((option) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setPriceFilter(option.value)}
+                                    className={cn(
+                                      "rounded-full border px-3 py-2 text-sm transition",
+                                      priceFilter === option.value
+                                        ? "border-transparent bg-[color-mix(in_srgb,var(--action)_16%,var(--surface))] text-[var(--foreground)]"
+                                        : "border-[var(--border-soft)] bg-[var(--surface)] text-[var(--foreground)]",
+                                    )}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </section>
+
+                            <section className="space-y-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <h3 className="text-sm font-semibold text-[var(--foreground)]">Categories</h3>
+                                <span className="text-xs text-[var(--muted-foreground)]">{selectedCategories.length || categories.length}</span>
+                              </div>
+
+                              <div className="rounded-[1rem] border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2.5">
+                                <label className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                                  <Search className="size-4" />
+                                  <input
+                                    value={categorySearch}
+                                    onChange={(event) => setCategorySearch(event.target.value)}
+                                    placeholder="Search categories"
+                                    className="w-full bg-transparent outline-none placeholder:text-[var(--muted-foreground)]"
+                                  />
+                                </label>
+                              </div>
+
+                              <div className="max-h-[18rem] space-y-2 overflow-y-auto pr-1">
+                                {visibleCategoryOptions.map((category) => (
+                                  <label key={category} className="flex cursor-pointer items-center gap-3 text-sm text-[var(--foreground)]">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedCategories.includes(category)}
+                                      onChange={() => toggleSidebarCategory(category)}
+                                      className="size-4 rounded accent-[var(--action)]"
+                                    />
+                                    <span>{category}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </section>
+                          </div>
+                        </div>
+                      </aside>
+
+                      <div className="space-y-4">
+                        <div className="public-home-search-shell rounded-[1.1rem] p-1.5 shadow-[0_8px_22px_rgba(3,10,18,0.12)]">
+                          <label className="flex items-center gap-3 rounded-[1.05rem] px-4 py-3">
+                            <Search className="size-5 text-[var(--action)]" />
+                            <input
+                              value={query}
+                              onChange={(event) => setQuery(event.target.value)}
+                              placeholder="Search products, categories, deals"
+                              className="w-full bg-transparent text-[1rem] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="space-y-3 lg:hidden">
+                          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                            {categoryChips.map((category) => {
+                              const isActive = category === "All" ? selectedCategories.length === 0 : selectedCategories.includes(category);
+
+                              return (
+                                <button
+                                  key={category}
+                                  type="button"
+                                  onClick={() => chooseQuickCategory(category)}
+                                  className="public-home-chip inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm transition text-[var(--foreground)]"
+                                  data-active={isActive}
+                                >
+                                  {isActive ? <Check className="size-3.5" /> : null}
+                                  {category}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <select
+                            value={sort}
+                            onChange={(event) => setSort(event.target.value)}
+                            className="public-home-select w-full rounded-[1rem] border px-4 py-3 text-[1rem] text-[var(--foreground)] outline-none"
                           >
-                            {selectedCategory === category ? <Check className="size-3.5" /> : null}
-                            {category}
-                          </button>
-                        ))}
-                      </div>
+                            {PUBLIC_SORT_OPTIONS.map((option) => (
+                              <option key={option}>{option}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <select
-                        value={sort}
-                        onChange={(event) => setSort(event.target.value)}
-                        className="public-home-select w-full rounded-[1rem] border px-4 py-3 text-[1rem] text-[var(--foreground)] outline-none"
-                      >
-                        <option>Featured</option>
-                        <option>Price: Low to High</option>
-                        <option>Price: High to Low</option>
-                        <option>Stock</option>
-                        <option>Name</option>
-                      </select>
+                        <div className="hidden items-center justify-between rounded-[1.2rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_88%,var(--background-start))] px-4 py-3 lg:flex">
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--foreground)]">{products.length} products ready to browse</p>
+                            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                              Filter by deals, stock, price range, and grocery category.
+                            </p>
+                          </div>
+                          {activeFilterCount ? (
+                            <button type="button" onClick={resetFilters} className="text-sm font-medium text-[var(--action)]">
+                              Clear filters
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {groupedProducts.length ? (
+                          <div className="space-y-6">
+                            {groupedProducts.map((group, groupIndex) => (
+                              <EntranceMotion key={group.category} delay={0.24 + groupIndex * 0.1}>
+                                <section className="space-y-4">
+                                  <h2 className="px-1 text-[1.18rem] font-medium text-[var(--foreground)]">{group.category}</h2>
+
+                                  <PublicHeroCarousel
+                                    products={group.products.slice(0, 5)}
+                                    onRequireLogin={openClientLogin}
+                                    reverse={groupIndex % 2 === 1}
+                                  />
+
+                                  <div className="rounded-[1.55rem]">
+                                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                                      {group.products
+                                        .slice(0, visibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS)
+                                        .map((product) => (
+                                        <div key={`${group.category}-${product.id}-grid`}>
+                                          <PublicProductCard product={product} onRequireLogin={openClientLogin} />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {group.products.length > (visibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS) ? (
+                                    <div className="flex justify-center pt-1">
+                                      <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="rounded-full px-5 py-2.5 text-sm shadow-none"
+                                        onClick={() => showMoreProducts(group.category)}
+                                      >
+                                        Show more
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                </section>
+                              </EntranceMotion>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-[1.25rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_82%,var(--background-start))] px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
+                            No matching products.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </EntranceMotion>
-
-                  {groupedProducts.length ? (
-                    <div className="space-y-6">
-                      {groupedProducts.map((group, groupIndex) => (
-                        <EntranceMotion key={group.category} delay={0.24 + groupIndex * 0.1}>
-                          <section className="space-y-4">
-                            <h2 className="px-1 text-[1.18rem] font-medium text-[var(--foreground)]">{group.category}</h2>
-
-                            <PublicHeroCarousel
-                              products={group.products.slice(0, 5)}
-                              onRequireLogin={openClientLogin}
-                              reverse={groupIndex % 2 === 1}
-                            />
-
-                            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-                              {group.products.slice(0, 8).map((product, index) => (
-                                <div key={`${group.category}-${product.id}-grid`} className={cn(index >= 4 && "hidden lg:block")}>
-                                  <PublicProductCard product={product} onRequireLogin={openClientLogin} />
-                                </div>
-                              ))}
-                            </div>
-                          </section>
-                        </EntranceMotion>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-[1.25rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_82%,var(--background-start))] px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
-                      No matching products.
-                    </div>
-                  )}
+                </div>
                 </div>
               </div>
             </section>
