@@ -1,16 +1,15 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Check,
   Eye,
   EyeOff,
   Heart,
   Search,
   ShieldCheck,
-  ShoppingCart,
-  Star,
   User,
 } from "lucide-react";
 
@@ -22,11 +21,15 @@ import { useAppStore } from "@/components/app-store-provider";
 import { Button } from "@/components/ui/button";
 import { cn, formatCurrency } from "@/lib/utils";
 
+function getDiscountedPrice(product) {
+  return product.price * (1 - product.discountPercent / 100);
+}
+
 function SurfaceCard({ children, className = "" }) {
   return (
     <div
       className={cn(
-        "app-card p-6",
+        "app-card p-4 sm:p-6",
         className,
       )}
     >
@@ -35,66 +38,259 @@ function SurfaceCard({ children, className = "" }) {
   );
 }
 
-function PublicProductCard({ product, onRequireLogin }) {
+function PublicHeroCard({ product, onRequireLogin }) {
   return (
-    <HoverLift hoverOffset={8} hoverScale={1.002} hoverElevation={18} normalElevation={6}>
+    <HoverLift hoverOffset={6} hoverScale={1.003} hoverElevation={12} normalElevation={0}>
       <article
-        className="app-card overflow-hidden"
-        onClick={() => onRequireLogin("Login to view product details.")}
+        className="min-w-[17.75rem] snap-start sm:min-w-[19.5rem] lg:min-w-[21rem]"
       >
-        <div
-          className="relative aspect-[4/3] bg-cover bg-center"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.56)), url(${product.image})`,
-          }}
+        <button
+          type="button"
+          onClick={() => onRequireLogin("Login to view product details.")}
+          className="group block w-full text-left"
         >
-          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4">
-            <div>
-              <p className="text-xs text-white/75">{product.category}</p>
-              <h3 className="mt-1 text-lg font-bold text-white">{product.name}</h3>
+          <div className="relative h-[13.5rem] overflow-hidden rounded-[1.55rem] bg-[#d8dcdf] sm:h-[14.5rem]">
+            <div
+              className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-[1.025]"
+              style={{ backgroundImage: `url(${product.image})` }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.3),rgba(255,255,255,0.05)_38%,rgba(0,0,0,0.66))]" />
+            <div className="absolute inset-x-0 bottom-0 p-4.5 sm:p-5">
+              <div>
+                <p className="text-xs text-white/72">{product.category}</p>
+                <h3 className="mt-2 max-w-[11rem] text-[1.68rem] font-bold leading-[1.03] text-white sm:max-w-[12rem] sm:text-[1.8rem]">{product.name}</h3>
+                <p className="mt-2 line-clamp-2 max-w-[13rem] text-[0.76rem] leading-5 text-white/72">{product.description}</p>
+              </div>
+              <div className="mt-4 inline-flex items-center rounded-[0.9rem] border border-white/12 bg-white/16 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur-sm">
+                {formatCurrency(getDiscountedPrice(product))}
+              </div>
             </div>
+          </div>
+        </button>
+      </article>
+    </HoverLift>
+  );
+}
+
+function PublicProductCard({ product, onRequireLogin }) {
+  const discountedPrice = getDiscountedPrice(product);
+  const hasDiscount = product.discountPercent > 0 && discountedPrice < product.price;
+
+  return (
+    <HoverLift hoverOffset={5} hoverScale={1.006} hoverElevation={20} normalElevation={8}>
+      <article className="public-home-product-card overflow-hidden rounded-[1.45rem] shadow-[0_16px_38px_rgba(3,10,18,0.22)]">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onRequireLogin("Login to view product details.")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onRequireLogin("Login to view product details.");
+            }
+          }}
+          className="block w-full cursor-pointer text-left"
+          aria-label={`Open ${product.name}`}
+        >
+          <div className="relative aspect-[1/0.92] overflow-hidden bg-[#d7dadd]">
+            <div
+              className="absolute inset-0 bg-cover bg-center transition duration-500 hover:scale-[1.03]"
+              style={{ backgroundImage: `url(${product.image})` }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(0,0,0,0.52))]" />
             <button
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
                 onRequireLogin("Login to save favorites.");
               }}
-              className="inline-flex size-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm"
+              className="absolute bottom-3 right-3 inline-flex size-9 items-center justify-center rounded-full border border-white/16 bg-black/26 text-white backdrop-blur-sm"
               aria-label="Favorite"
             >
               <Heart className="size-4" />
             </button>
           </div>
         </div>
-        <div className="p-4">
-          <p className="line-clamp-2 text-sm text-[var(--foreground)]/82">{product.description}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--muted-foreground)]">
-            <span className="font-semibold text-[var(--foreground)]">
-              {formatCurrency(product.price * (1 - product.discountPercent / 100))}
+
+        <div className="space-y-3 px-3.5 pb-3.5 pt-3">
+          <div>
+            <h3 className="line-clamp-2 text-[0.98rem] font-semibold leading-5 text-[var(--public-home-product-foreground)]">{product.name}</h3>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {hasDiscount ? (
+              <span className="public-home-product-muted text-[0.88rem] line-through">
+                {formatCurrency(product.price)}
+              </span>
+            ) : null}
+            <span className="font-semibold text-[var(--public-home-product-foreground)]">
+              {formatCurrency(discountedPrice)}
             </span>
-            {product.discountPercent ? <span className="text-green-700">{product.discountPercent}% off</span> : null}
-            <Star className="size-4 text-amber-500" />
-            <span>{product.rating.toFixed(1)} *</span>
+            {hasDiscount ? <span className="text-emerald-400">{product.discountPercent}% off</span> : null}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-            <span className={cn("font-medium", product.stock <= 5 ? "text-red-600" : "text-green-700")}>
-              {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
-            </span>
-          </div>
-          <div className="mt-4">
-            <Button
-              className="w-full"
-              onClick={(event) => {
-                event.stopPropagation();
-                onRequireLogin("Login to add items to cart.");
-              }}
-            >
-              {product.stock > 0 ? "Add to cart" : "Out of stock"}
-            </Button>
-          </div>
+
+          <p className={cn("text-xs font-medium", product.stock <= 5 ? "text-red-400" : "text-emerald-400")}>
+            {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
+          </p>
+
+          <Button
+            className="w-full rounded-[0.95rem] border border-[color-mix(in_srgb,var(--action)_36%,transparent)] bg-[var(--action)] py-2.5 text-[var(--action-foreground)] shadow-none hover:brightness-[1.01]"
+            onClick={() => onRequireLogin("Login to add items to cart.")}
+          >
+            {product.stock > 0 ? "Add to cart" : "Out of stock"}
+          </Button>
         </div>
       </article>
     </HoverLift>
+  );
+}
+
+function PublicHeroCarousel({ products, onRequireLogin, reverse = false }) {
+  const USER_PAUSE_MS = 1000;
+  const REPEAT_COUNT = 5;
+  const BASE_CYCLE_INDEX = Math.floor(REPEAT_COUNT / 2);
+  const scrollRef = useRef(null);
+  const animationRef = useRef(null);
+  const lastTimeRef = useRef(0);
+  const interactionUntilRef = useRef(0);
+  const pointerActiveRef = useRef(false);
+  const currentVelocityRef = useRef(0);
+  const targetVelocityRef = useRef(0);
+  const shouldAutoScroll = products.length > 1;
+  const visibleProducts = products.slice(0, 5);
+  const productIdsKey = visibleProducts.map((product) => product.id).join("|");
+  const productKey = visibleProducts.map((product) => product.id).join("|");
+
+  useEffect(() => {
+    const scrollNode = scrollRef.current;
+
+    if (!scrollNode) {
+      return undefined;
+    }
+
+    lastTimeRef.current = 0;
+    interactionUntilRef.current = 0;
+    pointerActiveRef.current = false;
+    currentVelocityRef.current = 0;
+    targetVelocityRef.current = 0;
+
+    if (!shouldAutoScroll || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return undefined;
+    }
+
+    const cycleWidth = scrollNode.scrollWidth / REPEAT_COUNT;
+    if (!cycleWidth) {
+      return undefined;
+    }
+
+    scrollNode.scrollLeft = cycleWidth * BASE_CYCLE_INDEX;
+
+    const step = (now) => {
+      if (!scrollNode) {
+        return;
+      }
+
+      if (lastTimeRef.current === 0) {
+        lastTimeRef.current = now;
+      }
+
+      const delta = now - lastTimeRef.current;
+      lastTimeRef.current = now;
+
+      const baseSpeed = window.innerWidth < 640 ? 0.04 : 0.05;
+      const directionalSpeed = reverse ? -baseSpeed : baseSpeed;
+
+      if (!pointerActiveRef.current && now >= interactionUntilRef.current) {
+        targetVelocityRef.current = directionalSpeed;
+      } else {
+        targetVelocityRef.current = 0;
+      }
+
+      const easing = pointerActiveRef.current ? 0.12 : 0.045;
+      currentVelocityRef.current += (targetVelocityRef.current - currentVelocityRef.current) * easing;
+
+      if (Math.abs(currentVelocityRef.current) < 0.0006) {
+        currentVelocityRef.current = 0;
+      }
+
+      if (currentVelocityRef.current !== 0) {
+        scrollNode.scrollLeft += delta * currentVelocityRef.current;
+      }
+
+      while (scrollNode.scrollLeft <= cycleWidth * (BASE_CYCLE_INDEX - 0.5)) {
+        scrollNode.scrollLeft += cycleWidth;
+      }
+
+      while (scrollNode.scrollLeft >= cycleWidth * (BASE_CYCLE_INDEX + 0.5)) {
+        scrollNode.scrollLeft -= cycleWidth;
+      }
+
+      animationRef.current = window.requestAnimationFrame(step);
+    };
+
+    animationRef.current = window.requestAnimationFrame(step);
+
+    return () => {
+      if (animationRef.current) {
+        window.cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [BASE_CYCLE_INDEX, REPEAT_COUNT, productIdsKey, reverse, shouldAutoScroll]);
+
+  if (!shouldAutoScroll) {
+    return (
+      <div className="overflow-hidden pb-1">
+        <div className="flex gap-4">
+          {visibleProducts.map((product) => (
+            <PublicHeroCard key={`${product.id}-single`} product={product} onRequireLogin={onRequireLogin} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="overflow-hidden pb-1"
+      onPointerDown={() => {
+        pointerActiveRef.current = true;
+        interactionUntilRef.current = performance.now() + USER_PAUSE_MS;
+        targetVelocityRef.current = 0;
+      }}
+      onPointerUp={() => {
+        pointerActiveRef.current = false;
+        interactionUntilRef.current = performance.now() + USER_PAUSE_MS;
+      }}
+      onPointerCancel={() => {
+        pointerActiveRef.current = false;
+        interactionUntilRef.current = performance.now() + USER_PAUSE_MS;
+      }}
+      onWheel={() => {
+        interactionUntilRef.current = performance.now() + USER_PAUSE_MS;
+        targetVelocityRef.current = 0;
+      }}
+    >
+      <div
+        ref={scrollRef}
+        className="flex gap-0 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {Array.from({ length: REPEAT_COUNT }, (_, cycleIndex) => (
+          <div
+            key={`cycle-${cycleIndex}`}
+            aria-hidden={cycleIndex !== BASE_CYCLE_INDEX}
+            className={cn("flex shrink-0 gap-4", cycleIndex !== REPEAT_COUNT - 1 && "pr-4")}
+          >
+            {visibleProducts.map((product) => (
+              <PublicHeroCard
+                key={`${product.id}-cycle-${cycleIndex}`}
+                product={product}
+                onRequireLogin={onRequireLogin}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -398,6 +594,20 @@ export function PublicAuthGate() {
     }
   }, [store.activeProducts, query, selectedCategory, sort]);
 
+  const groupedProducts = useMemo(() => {
+    const visibleCategories =
+      selectedCategory === "All"
+        ? categories.filter((category) => category !== "All")
+        : [selectedCategory];
+
+    return visibleCategories
+      .map((category) => ({
+        category,
+        products: products.filter((product) => product.category === category),
+      }))
+      .filter((group) => group.products.length);
+  }, [categories, products, selectedCategory]);
+
   useEffect(() => {
     const authView = searchParams.get("auth");
 
@@ -472,7 +682,7 @@ export function PublicAuthGate() {
   const viewKey = showingPublicShop ? "public-shop" : authKey;
 
   return (
-    <main className="app-shell">
+    <main className={cn("app-shell", showingPublicShop ? "app-shell-public" : "app-shell-auth")}>
       <AnimatePresence mode="wait">
         <motion.div
           key={viewKey}
@@ -482,74 +692,90 @@ export function PublicAuthGate() {
           transition={{ duration: 0.48, ease: easeInOutCubic }}
         >
           {showingPublicShop ? (
-            <>
-              <header className="app-bar px-5 py-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <h1 className="text-2xl font-semibold text-[var(--foreground)]">Shop</h1>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ThemeToggle />
-                    <button type="button" onClick={() => openClientLogin("")} className="app-link-button">
-                      Login
-                    </button>
-                  </div>
-                </div>
-              </header>
+            <section className="public-home-screen w-full overflow-hidden border border-transparent shadow-[0_30px_80px_rgba(2,10,18,0.12)]">
+              <div className="relative isolate overflow-hidden">
+                <div className="pointer-events-none absolute -right-14 top-12 h-44 w-44 rounded-full bg-[color-mix(in_srgb,var(--action)_22%,transparent)] blur-2xl" />
+                <div className="pointer-events-none absolute -left-18 bottom-[-5rem] h-52 w-52 rounded-full bg-[color-mix(in_srgb,var(--accent-secondary)_38%,transparent)] blur-2xl" />
 
-              <section className="mt-6 space-y-6">
-                <EntranceMotion delay={0.08}>
-                  <div className="app-card-inset px-5 py-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-sm leading-7 text-[var(--foreground)]">Browse products freely. Login to add items and checkout.</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRoleTab("client");
-                          setShowRegister(true);
-                          setShowPublicShop(false);
-                          setNotice("");
-                          syncAuthView("register");
-                        }}
-                        className="app-link-button"
-                      >
-                        Create account
+                <header className="relative z-[70] px-4 pb-2.5 pt-3.5 sm:px-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <h1 className="text-[1.3rem] font-semibold tracking-[-0.03em] text-[var(--foreground)] sm:text-[1.42rem]">Shop</h1>
+                    <div className="flex items-center gap-2">
+                      <div className="relative z-[80] origin-center scale-[0.92] sm:scale-[0.96]">
+                        <ThemeToggle />
+                      </div>
+                      <button type="button" onClick={() => openClientLogin("")} className="app-link-button !px-2.5 !py-1.5 text-[0.92rem] text-[var(--foreground)]">
+                        Login
                       </button>
                     </div>
                   </div>
-                </EntranceMotion>
+                </header>
 
-                {notice ? <AuthNotice>{notice}</AuthNotice> : null}
-
-                <EntranceMotion delay={0.16}>
-                  <div className="space-y-3">
-                    <div className="app-search-shell p-1.5">
-                      <label className="flex items-center gap-3 rounded-[1.125rem] px-4 py-3">
-                        <Search className="size-4 text-[var(--muted-foreground)]" />
-                        <input
-                          value={query}
-                          onChange={(event) => setQuery(event.target.value)}
-                          placeholder="Search products, categories, deals"
-                          className="w-full bg-transparent text-sm outline-none"
-                        />
-                      </label>
+                <div className="space-y-4 px-4 pb-6 sm:px-5 sm:pb-8">
+                  <EntranceMotion delay={0.08}>
+                    <div className="public-home-banner relative overflow-hidden rounded-[0.2rem] px-3.5 py-2.5 shadow-[0_12px_28px_rgba(2,10,18,0.16)] sm:px-4 sm:py-3">
+                      <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-32 rounded-full bg-[color-mix(in_srgb,var(--action)_18%,transparent)]" />
+                      <div className="relative flex items-start justify-between gap-3">
+                        <p className="min-w-0 flex-1 pr-1 text-[0.88rem] leading-6 text-[var(--foreground)] sm:text-[0.92rem] sm:leading-7">
+                          Browse products freely. Login to add items and checkout.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoleTab("client");
+                            setShowRegister(true);
+                            setShowPublicShop(false);
+                            setNotice("");
+                            syncAuthView("register");
+                          }}
+                          className="shrink-0 rounded-xl px-0 py-1.5 text-[0.9rem] font-medium text-[var(--action)] sm:text-[0.94rem]"
+                        >
+                          Create account
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex flex-wrap gap-2">
+                  </EntranceMotion>
+
+                  {notice ? <AuthNotice>{notice}</AuthNotice> : null}
+
+                  <EntranceMotion delay={0.16}>
+                    <div className="space-y-3">
+                      <div className="public-home-search-shell rounded-[1.1rem] p-1.5 shadow-[0_8px_22px_rgba(3,10,18,0.12)]">
+                        <label className="flex items-center gap-3 rounded-[1.05rem] px-4 py-3">
+                          <Search className="size-5 text-[var(--action)]" />
+                          <input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search products, categories, deals"
+                            className="w-full bg-transparent text-[1rem] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                         {categories.map((category) => (
                           <button
                             key={category}
                             type="button"
                             onClick={() => setSelectedCategory(category)}
-                            className="app-chip px-4 py-2 text-sm"
+                            className={cn(
+                              "public-home-chip inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
+                              selectedCategory === category
+                                ? "text-[var(--foreground)]"
+                                : "text-[var(--foreground)]",
+                            )}
                             data-active={selectedCategory === category}
                           >
+                            {selectedCategory === category ? <Check className="size-3.5" /> : null}
                             {category}
                           </button>
                         ))}
                       </div>
+
                       <select
                         value={sort}
                         onChange={(event) => setSort(event.target.value)}
-                        className="app-select max-w-[15rem] px-4 py-3 text-sm"
+                        className="public-home-select w-full rounded-[1rem] border px-4 py-3 text-[1rem] text-[var(--foreground)] outline-none"
                       >
                         <option>Featured</option>
                         <option>Price: Low to High</option>
@@ -558,21 +784,43 @@ export function PublicAuthGate() {
                         <option>Name</option>
                       </select>
                     </div>
-                  </div>
-                </EntranceMotion>
+                  </EntranceMotion>
 
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                  {products.map((product, index) => (
-                    <EntranceMotion key={product.id} delay={0.24 + index * 0.04}>
-                      <PublicProductCard product={product} onRequireLogin={openClientLogin} />
-                    </EntranceMotion>
-                  ))}
+                  {groupedProducts.length ? (
+                    <div className="space-y-6">
+                      {groupedProducts.map((group, groupIndex) => (
+                        <EntranceMotion key={group.category} delay={0.24 + groupIndex * 0.1}>
+                          <section className="space-y-4">
+                            <h2 className="px-1 text-[1.18rem] font-medium text-[var(--foreground)]">{group.category}</h2>
+
+                            <PublicHeroCarousel
+                              products={group.products.slice(0, 5)}
+                              onRequireLogin={openClientLogin}
+                              reverse={groupIndex % 2 === 1}
+                            />
+
+                            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                              {group.products.slice(0, 8).map((product, index) => (
+                                <div key={`${group.category}-${product.id}-grid`} className={cn(index >= 4 && "hidden lg:block")}>
+                                  <PublicProductCard product={product} onRequireLogin={openClientLogin} />
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        </EntranceMotion>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-[1.25rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_82%,var(--background-start))] px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
+                      No matching products.
+                    </div>
+                  )}
                 </div>
-              </section>
-            </>
+              </div>
+            </section>
           ) : (
-            <section className="flex min-h-[70vh] items-center justify-center">
-              <div className="w-full max-w-md">
+            <section className="flex min-h-[100dvh] w-full items-center justify-center px-4 py-6 sm:px-6">
+              <div className="w-full max-w-[28.75rem]">
                 <EntranceMotion delay={0.08}>
                   <SurfaceCard>
                     <div className="mb-4 flex justify-end">

@@ -1,4 +1,4 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, handleRouteError, ok } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -28,7 +28,9 @@ export async function GET() {
     return ok({
       user,
     });
-  } catch {
-    return fail("Unable to load session user.", 500);
+  } catch (error) {
+    return handleRouteError(error, "Unable to load session user.", {
+      databaseMessage: "Unable to load session right now because the database is unreachable. Check your Neon connection and try again.",
+    });
   }
 }

@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { cn, formatCurrency } from "@/lib/utils";
 
 function Card({ children, className = "" }) {
-  return <div className={`app-card p-6 ${className}`}>{children}</div>;
+  return <div className={`app-card p-4 sm:p-6 ${className}`}>{children}</div>;
 }
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -919,17 +919,12 @@ export function AdminOrderManagementPageView() {
 
 export function AdminSalesReportPageView() {
   const store = useAppStore();
-  const [range, setRange] = useState(30);
+  const [range, setRange] = useState("month");
   const revenue = store.orders.filter((order) => order.status !== "cancelled").reduce((sum, order) => sum + order.total, 0);
   const cancelled = store.orders.filter((order) => order.status === "cancelled").reduce((sum, order) => sum + order.total, 0);
   const average = store.orders.length ? revenue / store.orders.length : 0;
   const salesRangeConfig = useMemo(() => {
-    const end = startOfDay(new Date());
-    return {
-      start: addDays(end, -(range - 1)),
-      end,
-      bucketDays: range >= 90 ? 7 : 1,
-    };
+    return getDashboardRangeConfig(range, null, null);
   }, [range]);
   const rangeOrders = useMemo(() => {
     return filterOrdersForRange(store.orders, salesRangeConfig);
@@ -975,14 +970,16 @@ export function AdminSalesReportPageView() {
         <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Sales Report</p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-[var(--foreground)]">High-level reporting for revenue and order quality.</h1>
         <div className="mt-6 flex flex-wrap gap-2">
-          {[7, 30, 90].map((value) => (
+          {dashboardRangeOptions
+            .filter((option) => option.key !== "custom")
+            .map((option) => (
             <button
-              key={value}
+              key={option.key}
               type="button"
-              onClick={() => setRange(value)}
-              className={cn("rounded-full px-4 py-2 text-sm font-semibold", range === value ? "bg-[var(--action)] text-[var(--action-foreground)]" : "bg-[var(--surface)] text-[var(--foreground)]")}
+              onClick={() => setRange(option.key)}
+              className={cn("rounded-full px-4 py-2 text-sm font-semibold", range === option.key ? "bg-[var(--action)] text-[var(--action-foreground)]" : "bg-[var(--surface)] text-[var(--foreground)]")}
             >
-              {value} days
+              {option.label}
             </button>
           ))}
         </div>
@@ -992,7 +989,7 @@ export function AdminSalesReportPageView() {
         <MetricCard icon={CircleDollarSign} label="Revenue" value={formatCurrency(revenue)} detail="Total non-cancelled revenue across the store." tone="success" />
         <MetricCard icon={AlertTriangle} label="Cancelled value" value={formatCurrency(cancelled)} detail="Lost revenue from cancelled orders." tone={cancelled ? "danger" : "neutral"} />
         <MetricCard icon={TrendingUp} label="Average order" value={formatCurrency(average)} detail="Average order value based on successful orders." tone="neutral" />
-        <MetricCard icon={Ticket} label="Coupon savings" value={formatCurrency(couponSavings)} detail={`Total discounts applied in the last ${range} days.`} tone="warning" />
+        <MetricCard icon={Ticket} label="Coupon savings" value={formatCurrency(couponSavings)} detail={`Total discounts applied during ${salesRangeConfig.label.toLowerCase()}.`} tone="warning" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -1044,8 +1041,10 @@ export function AdminCouponsPageView() {
   const [type, setType] = useState("percent");
   const [value, setValue] = useState("10");
   const [description, setDescription] = useState("");
-  const [audience, setAudience] = useState("everyone");
+  const [audience, setAudience] = useState("all");
   const [userEmail, setUserEmail] = useState("");
+  const [formMessage, setFormMessage] = useState("");
+  const [formTone, setFormTone] = useState("neutral");
 
   return (
     <div className="space-y-6">
@@ -1056,13 +1055,26 @@ export function AdminCouponsPageView() {
       <Card>
         <form
           className="grid gap-4 md:grid-cols-2"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            store.createCoupon({ code, type, value: Number(value), description, audience, userEmail });
+            const result = await store.createCoupon({
+              code,
+              type,
+              value: Number(value),
+              description,
+              audience,
+              userEmail,
+            });
+            setFormMessage(result.message);
+            setFormTone(result.success ? "success" : "error");
+            if (!result.success) {
+              return;
+            }
             setCode("");
             setDescription("");
             setUserEmail("");
             setValue("10");
+            setAudience("all");
           }}
         >
           <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Coupon code" className="rounded-[1.2rem] bg-[var(--surface)] px-4 py-3 text-sm outline-none" />
@@ -1072,13 +1084,16 @@ export function AdminCouponsPageView() {
           </select>
           <input value={value} onChange={(event) => setValue(event.target.value)} type="number" placeholder="Value" className="rounded-[1.2rem] bg-[var(--surface)] px-4 py-3 text-sm outline-none" />
           <select value={audience} onChange={(event) => setAudience(event.target.value)} className="rounded-[1.2rem] bg-[var(--surface)] px-4 py-3 text-sm outline-none">
-            <option value="everyone">Everyone</option>
+            <option value="all">All shoppers</option>
             <option value="user">Specific user</option>
           </select>
-          <input value={userEmail} onChange={(event) => setUserEmail(event.target.value)} placeholder="User email optional" className="rounded-[1.2rem] bg-[var(--surface)] px-4 py-3 text-sm outline-none" />
+          <input value={userEmail} onChange={(event) => setUserEmail(event.target.value)} placeholder={audience === "user" ? "Required user email" : "User email optional"} className="rounded-[1.2rem] bg-[var(--surface)] px-4 py-3 text-sm outline-none" />
           <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="rounded-[1.2rem] bg-[var(--surface)] px-4 py-3 text-sm outline-none" />
           <div className="md:col-span-2">
             <Button type="submit">Create coupon</Button>
+            {formMessage ? (
+              <p className={cn("mt-3 text-sm", formTone === "error" ? "text-rose-600" : "text-emerald-700")}>{formMessage}</p>
+            ) : null}
           </div>
         </form>
       </Card>

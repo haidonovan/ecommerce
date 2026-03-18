@@ -4,7 +4,7 @@ import { AdminShell } from "@/components/admin-shell";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function AdminIndexPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser({ suppressDatabaseErrors: true });
 
   if (!user) {
     redirect("/?auth=admin");

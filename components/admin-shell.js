@@ -183,7 +183,7 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="app-icon-button p-2 lg:hidden"
+              className="app-icon-button p-2 min-[700px]:hidden"
               aria-label="Open navigation"
             >
               <Menu className="size-5" />
@@ -192,13 +192,13 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <LogoutButton className="hidden sm:inline-flex" iconOnly />
+            <LogoutButton className="hidden min-[700px]:inline-flex" iconOnly />
           </div>
         </div>
       </header>
 
       {drawerOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/35 lg:hidden">
+        <div className="fixed inset-0 z-40 bg-black/35 min-[700px]:hidden">
           <div className="h-full w-[18rem] bg-[var(--background-start)] p-4 shadow-[var(--shadow-strong)]">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Admin</p>
@@ -221,8 +221,8 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
         </div>
       ) : null}
 
-      <section className="grid gap-6 pt-6 lg:grid-cols-[6.5rem_minmax(0,1fr)]">
-        <aside className="hidden lg:block">
+      <section className="grid gap-6 pt-6 min-[700px]:grid-cols-[6rem_minmax(0,1fr)]">
+        <aside className="hidden min-[700px]:block">
           <div className="app-nav-surface p-3">
             <div className="space-y-2">
               {adminTabs.map((tab) => (
@@ -244,7 +244,7 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
           </div>
         </aside>
 
-        <div>
+        <div className="min-w-0">
           <AnimatePresence mode="wait">
             <motion.div
               key={selectedTab}

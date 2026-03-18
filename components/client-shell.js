@@ -94,14 +94,14 @@ export function ClientShell({ user, initialTab = "shop" }) {
   }
 
   return (
-    <main className="app-shell pb-28">
+    <main className="app-shell pb-24 min-[600px]:pb-28">
       <header className="app-bar px-5 py-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="app-icon-button p-2 lg:hidden"
+              className="app-icon-button p-2 min-[600px]:hidden"
               aria-label="Open navigation"
             >
               <Menu className="size-5" />
@@ -132,7 +132,7 @@ export function ClientShell({ user, initialTab = "shop" }) {
       </header>
 
       {drawerOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/35 lg:hidden">
+        <div className="fixed inset-0 z-40 bg-black/35 min-[600px]:hidden">
           <div className="h-full w-[18rem] bg-[var(--background-start)] p-4 shadow-[var(--shadow-strong)]">
             <div className="mb-4 flex items-center justify-between">
               <div>
@@ -172,7 +172,7 @@ export function ClientShell({ user, initialTab = "shop" }) {
         </AnimatePresence>
       </div>
 
-      <nav className="app-nav-surface fixed bottom-4 left-4 right-4 z-30 hidden items-center justify-between p-2 md:flex lg:left-6 lg:right-6">
+      <nav className="app-nav-surface fixed bottom-4 left-4 right-4 z-30 hidden items-center justify-between p-2 min-[600px]:flex lg:left-6 lg:right-6">
         {clientTabs.map((tab) => (
           <button
             key={tab.key}

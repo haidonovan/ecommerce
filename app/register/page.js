@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function RegisterPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser({ suppressDatabaseErrors: true });
 
   if (user?.role === "ADMIN") {
     redirect("/admin");

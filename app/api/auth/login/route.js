@@ -1,4 +1,4 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, handleRouteError, ok } from "@/lib/api-response";
 import {
   createSessionToken,
   getAdminPassword,
@@ -88,7 +88,9 @@ export async function POST(request) {
 
     response.cookies.set(getSessionCookieName(), token, sessionCookieOptions());
     return response;
-  } catch {
-    return fail("Unable to process login request. Check Prisma env values and database connection.", 500);
+  } catch (error) {
+    return handleRouteError(error, "Unable to process login request.", {
+      databaseMessage: "Unable to process login right now because the database is unreachable. Check your Neon connection and try again.",
+    });
   }
 }

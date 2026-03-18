@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { fallbackProducts } from "@/lib/fallback-data";
 
-const STORAGE_KEY = "grocery-store-web-state-v1";
+const STORAGE_KEY = "grocery-store-web-state-v2";
 const AppStoreContext = createContext(null);
 
 function createInitialProducts() {
@@ -17,98 +17,9 @@ function createInitialState() {
     products: createInitialProducts(),
     favorites: [],
     cart: [],
-    orders: [
-      {
-        id: "ORD-1001",
-        createdAt: "2026-03-14T09:30:00.000Z",
-        shippingAddress: "120 Riverside Ave, Bangkok",
-        paymentMethod: "Cash on delivery",
-        status: "delivered",
-        trackingNumber: "TRK-9981",
-        trackingCarrier: "Flash Express",
-        trackingStatus: "Delivered",
-        couponCode: "WELCOME10",
-        couponDiscount: 4.2,
-        lines: [
-          {
-            productId: "market-box",
-            productName: "Weekend Market Box",
-            quantity: 1,
-            unitPrice: 42,
-            discountPercent: 15,
-          },
-        ],
-        total: 37.8,
-      },
-      {
-        id: "ORD-1002",
-        createdAt: "2026-03-16T13:15:00.000Z",
-        shippingAddress: "22 Orchard Lane, Chiang Mai",
-        paymentMethod: "Bank transfer",
-        status: "processing",
-        trackingNumber: null,
-        trackingCarrier: null,
-        trackingStatus: "Packing",
-        couponCode: null,
-        couponDiscount: 0,
-        lines: [
-          {
-            productId: "berry-mix",
-            productName: "Berry Energy Mix",
-            quantity: 2,
-            unitPrice: 12.75,
-            discountPercent: 0,
-          },
-        ],
-        total: 25.5,
-      },
-    ],
-    supportTickets: [
-      {
-        id: "SUP-2001",
-        subject: "Need delivery update",
-        status: "answered",
-        createdAt: "2026-03-15T08:45:00.000Z",
-        messages: [
-          {
-            id: "SUP-2001-1",
-            authorRole: "CLIENT",
-            authorEmail: "client@example.com",
-            message: "Can you check the delivery window for my order?",
-            createdAt: "2026-03-15T08:45:00.000Z",
-          },
-          {
-            id: "SUP-2001-2",
-            authorRole: "ADMIN",
-            authorEmail: "admin@example.com",
-            message: "We checked the courier and your parcel is arriving tomorrow.",
-            createdAt: "2026-03-15T09:10:00.000Z",
-          },
-        ],
-      },
-    ],
-    coupons: [
-      {
-        id: "COUPON-1",
-        code: "WELCOME10",
-        type: "percent",
-        value: 10,
-        isActive: true,
-        description: "Welcome discount for your first order.",
-        audience: "everyone",
-        userEmail: "",
-      },
-      {
-        id: "COUPON-2",
-        code: "VIPCLIENT",
-        type: "fixed",
-        value: 8,
-        isActive: true,
-        description: "Private reward coupon for returning shoppers.",
-        audience: "user",
-        userEmail: "client@example.com",
-      },
-    ],
+    orders: [],
+    supportTickets: [],
+    coupons: [],
   };
 }
 
@@ -350,7 +261,7 @@ export function AppStoreProvider({ children }) {
           cart: current.cart.filter((item) => item.productId !== productId),
         }));
       },
-      addComment(productId, message, authorEmail) {
+      addComment(productId, message) {
         fetch("/api/comments", {
           method: "POST",
           headers: {
@@ -378,29 +289,7 @@ export function AppStoreProvider({ children }) {
               ),
             }));
           })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              products: current.products.map((product) =>
-                product.id === productId
-                  ? {
-                      ...product,
-                      comments: [
-                        ...(product.comments || []),
-                        {
-                          id: `COMMENT-${Date.now()}`,
-                          userEmail: authorEmail,
-                          message,
-                          createdAt: new Date().toISOString(),
-                          updatedAt: new Date().toISOString(),
-                          isEdited: false,
-                        },
-                      ],
-                    }
-                  : product,
-              ),
-            }));
-          });
+          .catch(() => {});
       },
       updateComment(productId, commentId, message) {
         fetch(`/api/comments/${commentId}`, {
@@ -427,28 +316,7 @@ export function AppStoreProvider({ children }) {
               ),
             }));
           })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              products: current.products.map((product) =>
-                product.id === productId
-                  ? {
-                      ...product,
-                      comments: (product.comments || []).map((entry) =>
-                        entry.id === commentId
-                          ? {
-                              ...entry,
-                              message,
-                              updatedAt: new Date().toISOString(),
-                              isEdited: true,
-                            }
-                          : entry,
-                      ),
-                    }
-                  : product,
-              ),
-            }));
-          });
+          .catch(() => {});
       },
       deleteComment(productId, commentId) {
         fetch(`/api/comments/${commentId}`, {
@@ -470,19 +338,7 @@ export function AppStoreProvider({ children }) {
               ),
             }));
           })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              products: current.products.map((product) =>
-                product.id === productId
-                  ? {
-                      ...product,
-                      comments: (product.comments || []).filter((entry) => entry.id !== commentId),
-                    }
-                  : product,
-              ),
-            }));
-          });
+          .catch(() => {});
       },
       submitRating(productId, ratingValue) {
         const product = products.find((entry) => entry.id === productId);
@@ -511,131 +367,66 @@ export function AppStoreProvider({ children }) {
           ratingCount: nextCount,
         });
       },
-      async placeOrder({ shippingAddress, paymentMethod, couponCode, userEmail }) {
+      async placeOrder({ shippingAddress, paymentMethod, couponCode }) {
         const currentCart = state.cart;
         if (!currentCart.length) {
-          return null;
+          return { success: false, message: "Your cart is empty.", order: null };
         }
-        const response = await fetch("/api/orders", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            shippingAddress,
-            paymentMethod,
-            couponCode,
-            lines: currentCart.map((item) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-            })),
-          }),
-        });
-        const data = await response.json();
-        if (!response.ok || !data.data) {
-          const coupon = state.coupons.find(
-            (entry) =>
-              entry.isActive &&
-              entry.code.toLowerCase() === (couponCode || "").trim().toLowerCase() &&
-              (entry.audience === "everyone" || !entry.userEmail || entry.userEmail === userEmail),
-          );
-          const lines = currentCart
-            .map((item) => {
-              const product = state.products.find((entry) => entry.id === item.productId);
-              if (!product) {
-                return null;
-              }
-              return {
-                productId: product.id,
-                productName: product.name,
+        try {
+          const response = await fetch("/api/orders", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              shippingAddress,
+              paymentMethod,
+              couponCode,
+              lines: currentCart.map((item) => ({
+                productId: item.productId,
                 quantity: item.quantity,
-                unitPrice: Number(getDiscountedPrice(product).toFixed(2)),
-                discountPercent: product.discountPercent || 0,
-              };
-            })
-            .filter(Boolean);
-          const subtotal = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-          const couponDiscount = coupon
-            ? coupon.type === "percent"
-              ? Number(((subtotal * coupon.value) / 100).toFixed(2))
-              : Number(Math.min(coupon.value, subtotal).toFixed(2))
-            : 0;
-          const createdOrder = normalizeOrderTotals({
-            id: `ORD-${Math.floor(Date.now() / 1000)}`,
-            createdAt: new Date().toISOString(),
-            shippingAddress,
-            paymentMethod,
-            status: "pending",
-            trackingNumber: null,
-            trackingCarrier: null,
-            trackingStatus: "Order received",
-            couponCode: coupon?.code || null,
-            couponDiscount,
-            lines,
+              })),
+            }),
           });
+          const data = await response.json();
+          if (!response.ok || !data.data) {
+            return { success: false, message: data.error || "Unable to place order.", order: null };
+          }
           patch((current) => ({
             ...current,
             cart: [],
-            orders: [createdOrder, ...current.orders],
+            orders: [data.data, ...current.orders],
             products: current.products.map((product) => {
-              const line = lines.find((entry) => entry.productId === product.id);
+              const line = data.data.lines.find((entry) => entry.productId === product.id);
               return line ? { ...product, stock: Math.max(0, product.stock - line.quantity) } : product;
             }),
           }));
-          return createdOrder;
+          return { success: true, message: "", order: data.data };
+        } catch {
+          return { success: false, message: "Unable to place order right now.", order: null };
         }
-        patch((current) => ({
-          ...current,
-          cart: [],
-          orders: [data.data, ...current.orders],
-          products: current.products.map((product) => {
-            const line = data.data.lines.find((entry) => entry.productId === product.id);
-            return line ? { ...product, stock: Math.max(0, product.stock - line.quantity) } : product;
-          }),
-        }));
-        return data.data;
       },
-      submitSupportTicket(subject, message, authorEmail) {
-        fetch("/api/support", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ subject, message }),
-        })
-          .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
-          .then(({ ok, data }) => {
-            if (!ok || !data.data) {
-              return;
-            }
-            patch((current) => ({
-              ...current,
-              supportTickets: [data.data, ...current.supportTickets],
-            }));
-          })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              supportTickets: [
-                {
-                  id: `SUP-${Math.floor(Date.now() / 1000)}`,
-                  subject,
-                  status: "open",
-                  createdAt: new Date().toISOString(),
-                  messages: [
-                    {
-                      id: `SUP-MSG-${Date.now()}`,
-                      authorRole: "CLIENT",
-                      authorEmail,
-                      message,
-                      createdAt: new Date().toISOString(),
-                    },
-                  ],
-                },
-                ...current.supportTickets,
-              ],
-            }));
+      async submitSupportTicket(subject, message) {
+        try {
+          const response = await fetch("/api/support", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ subject, message }),
           });
+          const data = await response.json();
+          if (!response.ok || !data.data) {
+            return { success: false, message: data.error || "Unable to send support ticket." };
+          }
+          patch((current) => ({
+            ...current,
+            supportTickets: [data.data, ...current.supportTickets],
+          }));
+          return { success: true, message: "" };
+        } catch {
+          return { success: false, message: "Unable to send support ticket right now." };
+        }
       },
       replySupport(ticketId, message, authorEmail, authorRole) {
         if (isLocalOnlyId(ticketId)) {
@@ -680,29 +471,7 @@ export function AppStoreProvider({ children }) {
               supportTickets: current.supportTickets.map((ticket) => (ticket.id === ticketId ? data.data : ticket)),
             }));
           })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              supportTickets: current.supportTickets.map((ticket) =>
-                ticket.id === ticketId
-                  ? {
-                      ...ticket,
-                      status: authorRole === "ADMIN" ? "answered" : "open",
-                      messages: [
-                        ...ticket.messages,
-                        {
-                          id: `SUP-MSG-${Date.now()}`,
-                          authorRole,
-                          authorEmail,
-                          message,
-                          createdAt: new Date().toISOString(),
-                        },
-                      ],
-                    }
-                  : ticket,
-              ),
-            }));
-          });
+          .catch(() => {});
       },
       closeSupport(ticketId) {
         if (isLocalOnlyId(ticketId)) {
@@ -726,14 +495,7 @@ export function AppStoreProvider({ children }) {
               supportTickets: current.supportTickets.map((ticket) => (ticket.id === ticketId ? data.data : ticket)),
             }));
           })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              supportTickets: current.supportTickets.map((ticket) =>
-                ticket.id === ticketId ? { ...ticket, status: "closed" } : ticket,
-              ),
-            }));
-          });
+          .catch(() => {});
       },
       async addProduct(input) {
         try {
@@ -877,46 +639,29 @@ export function AppStoreProvider({ children }) {
               orders: current.orders.map((order) => (order.id === orderId ? data.data : order)),
             }));
           })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              orders: current.orders.map((order) =>
-                order.id === orderId ? normalizeOrderTotals({ ...order, ...changes }) : order,
-              ),
-            }));
-          });
+          .catch(() => {});
       },
-      createCoupon(input) {
-        fetch("/api/coupons", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(input),
-        })
-          .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
-          .then(({ ok, data }) => {
-            if (!ok || !data.data) {
-              return;
-            }
-            patch((current) => ({
-              ...current,
-              coupons: [data.data, ...current.coupons],
-            }));
-          })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              coupons: [
-                {
-                  id: `COUPON-${Math.floor(Date.now() / 1000)}`,
-                  isActive: true,
-                  ...input,
-                },
-                ...current.coupons,
-              ],
-            }));
+      async createCoupon(input) {
+        try {
+          const response = await fetch("/api/coupons", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(input),
           });
+          const data = await response.json();
+          if (!response.ok || !data.data) {
+            return { success: false, message: data.error || "Unable to create coupon." };
+          }
+          patch((current) => ({
+            ...current,
+            coupons: [data.data, ...current.coupons],
+          }));
+          return { success: true, message: "Coupon created." };
+        } catch {
+          return { success: false, message: "Unable to create coupon." };
+        }
       },
       toggleCoupon(id) {
         const coupon = state.coupons.find((entry) => entry.id === id);
@@ -947,12 +692,7 @@ export function AppStoreProvider({ children }) {
               coupons: current.coupons.map((entry) => (entry.id === id ? data.data : entry)),
             }));
           })
-          .catch(() => {
-            patch((current) => ({
-              ...current,
-              coupons: current.coupons.map((entry) => (entry.id === id ? { ...entry, isActive: !entry.isActive } : entry)),
-            }));
-          });
+          .catch(() => {});
       },
     };
   }, [state]);

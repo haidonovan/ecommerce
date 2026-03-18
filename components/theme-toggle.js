@@ -10,7 +10,8 @@ const MODE_STORAGE_KEY = "grocery-mode";
 const THEME_EVENT = "grocery-theme-change";
 const THEME_BLAST_EVENT = "grocery-theme-blast";
 const SERVER_SNAPSHOT = "classic::light";
-const THEME_SWAP_DELAY_MS = 380;
+const THEME_BLAST_DURATION_MS = 900;
+const THEME_SWAP_DELAY_MS = 405;
 
 function getStoredTheme() {
   if (typeof window === "undefined") {
@@ -58,10 +59,13 @@ function subscribe(callback) {
 function applyTheme(theme, mode) {
   const body = document.body;
   const resolvedMode = resolveMode(mode);
+  const root = document.documentElement;
 
   Object.values(appThemes).forEach(({ bodyClassName }) => body.classList.remove(bodyClassName));
   body.classList.add(appThemes[theme].bodyClassName);
   body.dataset.mode = resolvedMode;
+  root.dataset.mode = resolvedMode;
+  root.style.colorScheme = resolvedMode;
 }
 
 function resolveMode(mode) {
@@ -75,6 +79,7 @@ function resolveMode(mode) {
 export function ThemeToggle() {
   const rootRef = useRef(null);
   const swapTimerRef = useRef(null);
+  const transitionTimerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [theme, mode] = snapshot.split("::");
@@ -87,6 +92,12 @@ export function ThemeToggle() {
     return () => {
       if (swapTimerRef.current) {
         window.clearTimeout(swapTimerRef.current);
+      }
+      if (transitionTimerRef.current) {
+        window.clearTimeout(transitionTimerRef.current);
+      }
+      if (typeof document !== "undefined") {
+        delete document.body.dataset.themeTransition;
       }
     };
   }, []);
@@ -139,6 +150,7 @@ export function ThemeToggle() {
           y: rect ? rect.top + rect.height / 2 : 48,
           fill: blastColors.fill,
           ring: blastColors.ring,
+          durationMs: THEME_BLAST_DURATION_MS,
         },
       }),
     );
@@ -153,17 +165,25 @@ export function ThemeToggle() {
     if (swapTimerRef.current) {
       window.clearTimeout(swapTimerRef.current);
     }
+    if (transitionTimerRef.current) {
+      window.clearTimeout(transitionTimerRef.current);
+    }
 
+    document.body.dataset.themeTransition = "active";
     triggerBlast(nextTheme, nextMode);
     setOpen(false);
     swapTimerRef.current = window.setTimeout(() => {
       apply();
       swapTimerRef.current = null;
     }, THEME_SWAP_DELAY_MS);
+    transitionTimerRef.current = window.setTimeout(() => {
+      delete document.body.dataset.themeTransition;
+      transitionTimerRef.current = null;
+    }, THEME_BLAST_DURATION_MS + 60);
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative z-[90]">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}

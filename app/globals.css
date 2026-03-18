@@ -39,11 +39,15 @@ html {
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
   background:
     linear-gradient(135deg, var(--background-start), var(--background-end));
   color: var(--foreground);
   font-family: var(--font-space-grotesk), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  transition: background 220ms ease, color 220ms ease, border-color 220ms ease;
+  transition:
+    background 520ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    color 520ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    border-color 520ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 body::before,
@@ -54,6 +58,10 @@ body::after {
   border-radius: 999px;
   opacity: 0.42;
   pointer-events: none;
+  transition:
+    background-color 620ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    opacity 620ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    transform 620ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 body::before {
@@ -231,9 +239,37 @@ img {
 .app-card,
 .app-card-soft,
 .app-card-inset {
+  min-width: 0;
   border-radius: 1rem;
   border: 1px solid var(--border-soft);
   box-shadow: var(--shadow-card);
+}
+
+.app-shell > * {
+  min-width: 0;
+}
+
+.app-bar,
+.app-card,
+.app-card-soft,
+.app-card-inset,
+.app-search-shell,
+.app-chip,
+.app-link-button,
+.app-icon-button,
+.app-nav-surface,
+.app-nav-button,
+.app-theme-trigger,
+.app-theme-trigger-badge,
+.app-theme-menu,
+.app-theme-menu-item,
+.app-input,
+.app-select {
+  transition:
+    background-color 520ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    color 520ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    border-color 520ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    box-shadow 520ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-card {
@@ -294,7 +330,8 @@ img {
   font-size: 0.875rem;
   font-weight: 700;
   color: var(--foreground);
-  transition: background-color 180ms ease;
+  transform: translateZ(0);
+  transition: background-color 180ms ease, transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-link-button:hover {
@@ -310,6 +347,12 @@ img {
   background: var(--surface);
   color: var(--foreground);
   box-shadow: var(--shadow-soft);
+  transform: translateZ(0);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-top-label {
@@ -330,7 +373,8 @@ img {
 .app-nav-button {
   border-radius: 0.875rem;
   color: var(--muted-foreground);
-  transition: background-color 180ms ease, color 180ms ease;
+  transform: translateZ(0);
+  transition: background-color 180ms ease, color 180ms ease, transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-nav-button[data-active="true"] {
@@ -350,6 +394,12 @@ img {
   background: var(--surface);
   color: var(--foreground);
   box-shadow: var(--shadow-soft);
+  transform: translateZ(0);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-theme-trigger-badge {
@@ -372,9 +422,29 @@ img {
   position: absolute;
   right: 0;
   top: calc(100% + 0.55rem);
-  z-index: 50;
+  z-index: 120;
   min-width: 13.5rem;
+  max-width: min(13.5rem, calc(100vw - 1.5rem));
   padding: 0.5rem;
+}
+
+@media (max-width: 699px) {
+  .app-shell {
+    padding:
+      0.75rem
+      max(0.75rem, env(safe-area-inset-right))
+      calc(5.75rem + env(safe-area-inset-bottom))
+      max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .app-bar {
+    top: 0.75rem;
+    border-radius: 1rem;
+  }
+
+  .app-theme-menu {
+    width: min(13.5rem, calc(100vw - 1.5rem));
+  }
 }
 
 .app-theme-menu-section {
@@ -393,6 +463,11 @@ img {
   padding: 0.65rem 0.75rem;
   font-size: 0.92rem;
   color: var(--foreground);
+  transform: translateZ(0);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-theme-menu-item:hover {
@@ -403,10 +478,120 @@ img {
   background: color-mix(in srgb, var(--action) 12%, var(--surface));
 }
 
+.app-shell-public {
+  padding:
+    0
+    max(0px, env(safe-area-inset-right))
+    env(safe-area-inset-bottom)
+    max(0px, env(safe-area-inset-left));
+}
+
+.app-shell-auth {
+  padding:
+    0
+    max(0px, env(safe-area-inset-right))
+    env(safe-area-inset-bottom)
+    max(0px, env(safe-area-inset-left));
+}
+
+.public-home-screen {
+  min-height: 100dvh;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-soft) 84%, var(--surface)),
+      color-mix(in srgb, var(--surface) 86%, var(--background-end))
+    );
+  color: var(--foreground);
+}
+
+.public-home-banner {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface) 74%, var(--action)),
+      color-mix(in srgb, var(--surface) 68%, var(--accent))
+    );
+}
+
+.public-home-search-shell {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface) 72%, var(--action)),
+      color-mix(in srgb, var(--surface) 68%, var(--action))
+    );
+}
+
+.public-home-chip {
+  border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+  background: color-mix(in srgb, var(--surface) 82%, var(--background-start));
+}
+
+.public-home-chip[data-active="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--action) 16%, var(--surface));
+}
+
+.public-home-select {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--surface-quiet) 82%, var(--surface));
+}
+
+.public-home-product-card {
+  background: color-mix(in srgb, #08111a 82%, var(--action));
+  --public-home-product-foreground: color-mix(in srgb, white 92%, var(--surface));
+}
+
+.public-home-product-muted {
+  color: color-mix(in srgb, var(--public-home-product-foreground) 66%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-chip:active,
+  .app-link-button:active,
+  .app-icon-button:active,
+  .app-nav-button:active,
+  .app-theme-trigger:active,
+  .app-theme-menu-item:active {
+    transform: scale(0.97);
+  }
+}
+
 @media (min-width: 640px) {
   .app-shell {
     padding-top: 1.25rem;
     padding-inline: clamp(1.25rem, 2.6vw, 2rem);
+  }
+
+  .app-shell-public {
+    padding:
+      0
+      max(0px, env(safe-area-inset-right))
+      env(safe-area-inset-bottom)
+      max(0px, env(safe-area-inset-left));
+  }
+
+  .app-shell-auth {
+    padding:
+      0
+      max(0px, env(safe-area-inset-right))
+      env(safe-area-inset-bottom)
+      max(0px, env(safe-area-inset-left));
+  }
+
+  .public-home-screen {
+    min-height: 100dvh;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell-public {
+    padding:
+      0
+      10px
+      env(safe-area-inset-bottom)
+      10px;
   }
 }
 

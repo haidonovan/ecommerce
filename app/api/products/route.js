@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { fail } from "@/lib/api-response";
+import { fail, handleRouteError } from "@/lib/api-response";
+import { requireAdminUser } from "@/lib/auth";
 import { listCatalogProducts } from "@/lib/catalog";
 import { prisma } from "@/lib/prisma";
 import { productSchema } from "@/lib/validations";
@@ -13,6 +14,12 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const admin = await requireAdminUser();
+
+    if (!admin) {
+      return fail("Admin access required.", 403);
+    }
+
     const body = await request.json();
     const result = productSchema.safeParse(body);
 
@@ -50,7 +57,7 @@ export async function POST(request) {
         comments: [],
       },
     });
-  } catch {
-    return fail("Unable to create product.", 500);
+  } catch (error) {
+    return handleRouteError(error, "Unable to create product.");
   }
 }

@@ -1,4 +1,5 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, handleRouteError, ok } from "@/lib/api-response";
+import { requireAdminUser } from "@/lib/auth";
 import { cloudinary, getCloudinaryFolder } from "@/lib/cloudinary";
 
 export const runtime = "nodejs";
@@ -18,6 +19,12 @@ function uploadBufferToCloudinary(buffer, options) {
 }
 
 export async function POST(request) {
+  const admin = await requireAdminUser();
+
+  if (!admin) {
+    return fail("Admin access required.", 403);
+  }
+
   const cloudName =
     process.env.CLOUDINARY_CLOUD_NAME ||
     process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -48,7 +55,7 @@ export async function POST(request) {
       publicId: result.public_id,
       resourceType: result.resource_type,
     });
-  } catch {
-    return fail("Upload failed.", 500);
+  } catch (error) {
+    return handleRouteError(error, "Upload failed.");
   }
 }

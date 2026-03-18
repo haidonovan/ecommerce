@@ -1,37 +1,42 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, handleRouteError, ok } from "@/lib/api-response";
 import { getCurrentUser, requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeCoupon } from "@/lib/serializers";
 
 function mapCouponType(type) {
-  return String(type || "percent").toUpperCase();
+  return String(type || "percent").toLowerCase() === "fixed" ? "FIXED" : "PERCENT";
 }
 
 function mapAudience(audience) {
-  return String(audience || "everyone").toUpperCase();
+  const normalized = String(audience || "all").trim().toLowerCase();
+  return normalized === "user" || normalized === "specific" ? "USER" : "EVERYONE";
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
+  try {
+    const user = await getCurrentUser();
 
-  const coupons = await prisma.coupon.findMany({
-    where: user?.role === "ADMIN"
-      ? {}
-      : {
-          isActive: true,
-          OR: [
-            { audience: "EVERYONE" },
-            ...(user ? [{ userEmail: user.email }] : []),
-          ],
-        },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+    const coupons = await prisma.coupon.findMany({
+      where: user?.role === "ADMIN"
+        ? {}
+        : {
+            isActive: true,
+            OR: [
+              { audience: "EVERYONE" },
+              ...(user ? [{ userEmail: user.email }] : []),
+            ],
+          },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-  return ok({
-    data: coupons.map(serializeCoupon),
-  });
+    return ok({
+      data: coupons.map(serializeCoupon),
+    });
+  } catch (error) {
+    return handleRouteError(error, "Unable to load coupons.");
+  }
 }
 
 export async function POST(request) {
@@ -42,24 +47,38 @@ export async function POST(request) {
   }
 
   const body = await request.json();
+  const code = body.code?.trim().toUpperCase();
+  const value = Number(body.value);
+  const audience = mapAudience(body.audience);
+  const userEmail = body.userEmail?.trim().toLowerCase() || null;
 
-  if (!body.code || !body.type || body.value === undefined) {
+  if (!code || !body.type || body.value === undefined || Number.isNaN(value) || value <= 0) {
     return fail("Invalid coupon payload.", 422);
   }
 
-  const created = await prisma.coupon.create({
-    data: {
-      code: body.code.trim().toUpperCase(),
-      type: mapCouponType(body.type),
-      value: Number(body.value),
-      description: body.description?.trim() || null,
-      audience: mapAudience(body.audience),
-      userEmail: body.userEmail?.trim() || null,
-      isActive: true,
-    },
-  });
+  if (audience === "USER" && !userEmail) {
+    return fail("A specific-user coupon requires a target email.", 422);
+  }
 
-  return ok({
-    data: serializeCoupon(created),
-  });
+  try {
+    const created = await prisma.coupon.create({
+      data: {
+        code,
+        type: mapCouponType(body.type),
+        value,
+        description: body.description?.trim() || null,
+        audience,
+        userEmail,
+        isActive: true,
+      },
+    });
+
+    return ok({
+      data: serializeCoupon(created),
+    });
+  } catch (error) {
+    return handleRouteError(error, "Unable to create coupon.", {
+      conflictMessage: "Coupon code already exists.",
+    });
+  }
 }

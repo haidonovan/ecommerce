@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function AdminAreaPage({ children }) {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser({ suppressDatabaseErrors: true });
 
   if (!user) {
     redirect("/?auth=admin");

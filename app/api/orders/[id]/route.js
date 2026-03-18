@@ -1,10 +1,11 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, handleRouteError, ok } from "@/lib/api-response";
 import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeOrder } from "@/lib/serializers";
 
 function mapStatus(status) {
-  return String(status || "").toUpperCase();
+  const normalized = String(status || "").toUpperCase();
+  return ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"].includes(normalized) ? normalized : null;
 }
 
 export async function PATCH(request, { params }) {
@@ -16,6 +17,11 @@ export async function PATCH(request, { params }) {
 
   const body = await request.json();
   const { id } = await params;
+  const nextStatus = body.status !== undefined ? mapStatus(body.status) : undefined;
+
+  if (body.status !== undefined && !nextStatus) {
+    return fail("Invalid order status.", 422);
+  }
 
   try {
     const updated = await prisma.order.update({
@@ -23,7 +29,7 @@ export async function PATCH(request, { params }) {
         id,
       },
       data: {
-        ...(body.status ? { status: mapStatus(body.status) } : {}),
+        ...(body.status !== undefined ? { status: nextStatus } : {}),
         ...(body.trackingNumber !== undefined ? { trackingNumber: body.trackingNumber || null } : {}),
         ...(body.trackingCarrier !== undefined ? { trackingCarrier: body.trackingCarrier || null } : {}),
         ...(body.trackingStatus !== undefined ? { trackingStatus: body.trackingStatus || null } : {}),
@@ -40,10 +46,8 @@ export async function PATCH(request, { params }) {
       data: serializeOrder(updated),
     });
   } catch (error) {
-    if (error?.code === "P2025") {
-      return fail("Order not found.", 404);
-    }
-
-    throw error;
+    return handleRouteError(error, "Unable to update order.", {
+      notFoundMessage: "Order not found.",
+    });
   }
 }

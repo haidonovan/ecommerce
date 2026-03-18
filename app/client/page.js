@@ -4,7 +4,7 @@ import { ClientShell } from "@/components/client-shell";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function ClientIndexPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser({ suppressDatabaseErrors: true });
 
   if (!user) {
     redirect("/login");

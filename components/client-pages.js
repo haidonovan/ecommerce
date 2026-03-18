@@ -29,7 +29,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 function Card({ children, className = "" }) {
   return (
-    <div className={cn("app-card p-6", className)}>
+    <div className={cn("app-card p-4 sm:p-6", className)}>
       {children}
     </div>
   );
@@ -266,7 +266,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
               </button>
             ))}
           </div>
-          <select value={sort} onChange={(event) => setSort(event.target.value)} className="app-select max-w-[14rem] px-4 py-3 text-sm">
+          <select value={sort} onChange={(event) => setSort(event.target.value)} className="app-select w-full sm:max-w-[14rem] px-4 py-3 text-sm">
             <option value="featured">Featured</option>
             <option value="price-asc">Price low to high</option>
             <option value="price-desc">Price high to low</option>
@@ -372,7 +372,7 @@ export function ClientCartPageView() {
   );
 }
 
-export function ClientCheckoutPageView({ user }) {
+export function ClientCheckoutPageView() {
   const store = useAppStore();
   const router = useRouter();
   const [shippingAddress, setShippingAddress] = useState("");
@@ -386,17 +386,16 @@ export function ClientCheckoutPageView({ user }) {
       setMessage("Please enter a full shipping address.");
       return;
     }
-    const createdOrder = await store.placeOrder({
+    const result = await store.placeOrder({
       shippingAddress: shippingAddress.trim(),
       paymentMethod,
       couponCode: couponCode.trim(),
-      userEmail: user.email,
     });
-    if (!createdOrder) {
-      setMessage("Your cart is empty.");
+    if (!result.success || !result.order) {
+      setMessage(result.message || "Unable to place order.");
       return;
     }
-    setMessage(`Order ${createdOrder.id} placed successfully.`);
+    setMessage(`Order ${result.order.id} placed successfully.`);
     router.push("/client/order-history");
     router.refresh();
   }
@@ -601,7 +600,7 @@ export function ClientOrderHistoryPageView() {
                             <p className="font-semibold text-[var(--foreground)]">{line.productName}</p>
                             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
                               Qty {line.quantity}
-                              {line.discountPercent ? ` · ${line.discountPercent}% off` : " · Regular price"}
+                              {line.discountPercent ? ` | ${line.discountPercent}% off` : " | Regular price"}
                             </p>
                           </div>
                           <p className="text-sm font-semibold text-[var(--foreground)]">{formatCurrency(line.quantity * line.unitPrice)}</p>
@@ -658,6 +657,7 @@ export function ClientProfilePageView({ user }) {
   const store = useAppStore();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [supportNotice, setSupportNotice] = useState("");
   const [replyDrafts, setReplyDrafts] = useState({});
   const [copiedCoupon, setCopiedCoupon] = useState("");
 
@@ -665,15 +665,21 @@ export function ClientProfilePageView({ user }) {
     (ticket) => ticket.messages.some((entry) => entry.authorEmail === user.email) || ticket.messages[0]?.authorEmail === user.email,
   );
   const userCoupons = store.coupons.filter(
-    (coupon) => coupon.isActive && (coupon.audience === "everyone" || !coupon.userEmail || coupon.userEmail === user.email),
+    (coupon) => coupon.isActive && ((coupon.audience === "everyone" || coupon.audience === "all") || !coupon.userEmail || coupon.userEmail === user.email),
   );
 
-  function submitTicket(event) {
+  async function submitTicket(event) {
     event.preventDefault();
     if (subject.trim().length < 3 || message.trim().length < 3) {
+      setSupportNotice("Please enter a longer subject and message.");
       return;
     }
-    store.submitSupportTicket(subject.trim(), message.trim(), user.email);
+    const result = await store.submitSupportTicket(subject.trim(), message.trim());
+    if (!result.success) {
+      setSupportNotice(result.message || "Unable to send support ticket.");
+      return;
+    }
+    setSupportNotice("Support ticket sent.");
     setSubject("");
     setMessage("");
   }
@@ -827,6 +833,7 @@ export function ClientProfilePageView({ user }) {
           <p className="text-xs leading-6 text-[var(--muted-foreground)]">
             Only signed-in users can create tickets. Replies will appear above in your ticket history.
           </p>
+          {supportNotice ? <div className="rounded-2xl bg-[var(--surface-quiet)] px-4 py-3 text-sm">{supportNotice}</div> : null}
           <Button type="submit">Contact support</Button>
         </form>
       </Card>
@@ -939,7 +946,7 @@ export function ClientProductDetailPageView({ productId, user }) {
                       <div>
                         <p className="font-semibold text-[var(--foreground)]">{entry.userEmail}</p>
                         <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                          {entry.isEdited ? `Edited · ${formatDate(entry.updatedAt || entry.createdAt)}` : formatDate(entry.createdAt)}
+                          {entry.isEdited ? `Edited | ${formatDate(entry.updatedAt || entry.createdAt)}` : formatDate(entry.createdAt)}
                         </p>
                       </div>
                       {canEdit ? (
@@ -1016,7 +1023,7 @@ export function ClientProductDetailPageView({ productId, user }) {
                     if (comment.trim().length < 3) {
                       return;
                     }
-                    store.addComment(product.id, comment.trim(), user.email);
+                    store.addComment(product.id, comment.trim());
                     setComment("");
                   }}
                 >

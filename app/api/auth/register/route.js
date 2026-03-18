@@ -1,4 +1,4 @@
-import { fail, ok } from "@/lib/api-response";
+import { fail, handleRouteError, ok } from "@/lib/api-response";
 import {
   createSessionToken,
   getSessionCookieName,
@@ -65,7 +65,10 @@ export async function POST(request) {
 
     response.cookies.set(getSessionCookieName(), token, sessionCookieOptions());
     return response;
-  } catch {
-    return fail("Unable to process register request. Check Prisma env values and database connection.", 500);
+  } catch (error) {
+    return handleRouteError(error, "Unable to process register request.", {
+      conflictMessage: "An account with this email already exists.",
+      databaseMessage: "Unable to process registration right now because the database is unreachable. Check your Neon connection and try again.",
+    });
   }
 }
