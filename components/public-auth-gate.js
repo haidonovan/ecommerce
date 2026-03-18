@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
   Eye,
@@ -30,6 +30,7 @@ const PUBLIC_DEFAULT_ROWS = 3;
 const PUBLIC_SHOW_MORE_ROWS = 3;
 const PUBLIC_INITIAL_VISIBLE_PRODUCTS = PUBLIC_DESKTOP_COLUMNS * PUBLIC_DEFAULT_ROWS;
 const PUBLIC_SHOW_MORE_INCREMENT = PUBLIC_DESKTOP_COLUMNS * PUBLIC_SHOW_MORE_ROWS;
+const PUBLIC_REVEAL_DURATION_MS = 900;
 const PUBLIC_SORT_OPTIONS = [
   "Featured",
   "Price: Low to High",
@@ -592,6 +593,7 @@ function AdminLoginForm({ onSubmit, loading }) {
 
 export function PublicAuthGate() {
   const store = useAppStore();
+  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
@@ -606,6 +608,7 @@ export function PublicAuthGate() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [visibleGridCounts, setVisibleGridCounts] = useState({});
+  const [revealState, setRevealState] = useState(null);
 
   const categories = useMemo(() => [...new Set(store.activeProducts.map((product) => product.category))], [store.activeProducts]);
   const categoryChips = useMemo(() => ["All", ...categories], [categories]);
@@ -715,6 +718,20 @@ export function PublicAuthGate() {
   }, [groupedProducts]);
 
   useEffect(() => {
+    if (!revealState) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setRevealState(null);
+    }, PUBLIC_REVEAL_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [revealState]);
+
+  useEffect(() => {
     const authView = searchParams.get("auth");
 
     if (authView === "admin") {
@@ -744,7 +761,14 @@ export function PublicAuthGate() {
   }, [searchParams]);
 
   function syncAuthView(view) {
-    router.replace(view ? `/?auth=${view}` : "/");
+    const nextUrl = view ? `/?auth=${view}` : "/";
+
+    if (typeof window !== "undefined" && pathname === "/") {
+      window.history.replaceState(window.history.state, "", nextUrl);
+      return;
+    }
+
+    router.replace(nextUrl);
   }
 
   function openClientLogin(nextNotice = "") {
@@ -788,10 +812,15 @@ export function PublicAuthGate() {
   }
 
   function showMoreProducts(category) {
-    setVisibleGridCounts((current) => ({
-      ...current,
-      [category]: (current[category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS) + PUBLIC_SHOW_MORE_INCREMENT,
-    }));
+    setVisibleGridCounts((current) => {
+      const start = current[category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS;
+      setRevealState({ category, start });
+
+      return {
+        ...current,
+        [category]: start + PUBLIC_SHOW_MORE_INCREMENT,
+      };
+    });
   }
 
   async function submitAuth(endpoint, payload, redirectTo) {
@@ -828,13 +857,13 @@ export function PublicAuthGate() {
 
   return (
     <main className={cn("app-shell", showingPublicShop ? "app-shell-public" : "app-shell-auth")}>
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={viewKey}
-          initial={{ opacity: 0, x: -14, scale: 0.98 }}
+          initial={{ opacity: 0, y: 8, scale: 0.995 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
-          exit={{ opacity: 0, x: 12, scale: 0.98 }}
-          transition={{ duration: 0.48, ease: easeInOutCubic }}
+          exit={{ opacity: 0, y: -8, scale: 0.995 }}
+          transition={{ duration: 0.24, ease: easeInOutCubic }}
         >
           {showingPublicShop ? (
             <section className="public-home-screen w-full overflow-hidden">
@@ -1073,11 +1102,25 @@ export function PublicAuthGate() {
                                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                                       {group.products
                                         .slice(0, visibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS)
-                                        .map((product) => (
-                                        <div key={`${group.category}-${product.id}-grid`}>
+                                        .map((product, index) => {
+                                        const isRevealed =
+                                          revealState?.category === group.category &&
+                                          index >= revealState.start;
+
+                                        return (
+                                        <motion.div
+                                          key={`${group.category}-${product.id}-grid`}
+                                          initial={isRevealed ? { opacity: 0, x: 36 } : false}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          transition={{
+                                            duration: isRevealed ? 0.38 : 0.22,
+                                            delay: isRevealed ? (index - revealState.start) * 0.055 : 0,
+                                            ease: easeInOutCubic,
+                                          }}
+                                        >
                                           <PublicProductCard product={product} onRequireLogin={openClientLogin} />
-                                        </div>
-                                      ))}
+                                        </motion.div>
+                                      )})}
                                     </div>
                                   </div>
 
@@ -1086,7 +1129,7 @@ export function PublicAuthGate() {
                                       <Button
                                         type="button"
                                         variant="secondary"
-                                        className="rounded-full px-5 py-2.5 text-sm shadow-none"
+                                        className="rounded-full border-2 border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] px-5 py-2.5 text-sm shadow-none hover:border-[color-mix(in_srgb,var(--foreground)_36%,transparent)]"
                                         onClick={() => showMoreProducts(group.category)}
                                       >
                                         Show more
