@@ -1,17 +1,9 @@
-import { redirect } from "next/navigation";
+import { AdminLoginForm } from "@/components/admin-login-form";
 
-import { getCurrentUser } from "@/lib/auth";
+export const metadata = {
+  title: "Admin Login",
+};
 
-export default async function AdminLoginPage() {
-  const user = await getCurrentUser({ suppressDatabaseErrors: true });
-
-  if (user?.role === "ADMIN") {
-    redirect("/admin");
-  }
-
-  if (user?.role === "CLIENT") {
-    redirect("/client");
-  }
-
-  redirect("/?auth=admin");
+export default function AdminLoginPage() {
+  return <AdminLoginForm />;
 }

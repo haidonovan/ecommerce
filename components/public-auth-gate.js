@@ -591,7 +591,7 @@ function AdminLoginForm({ onSubmit, loading }) {
   );
 }
 
-export function PublicAuthGate() {
+export function PublicAuthGate({ initialAuthView = "" }) {
   const store = useAppStore();
   const pathname = usePathname();
   const router = useRouter();
@@ -732,7 +732,7 @@ export function PublicAuthGate() {
   }, [revealState]);
 
   useEffect(() => {
-    const authView = searchParams.get("auth");
+    const authView = searchParams.get("auth") || initialAuthView;
 
     if (authView === "admin") {
       setRoleTab("admin");
@@ -758,7 +758,7 @@ export function PublicAuthGate() {
     setRoleTab("client");
     setShowRegister(false);
     setShowPublicShop(true);
-  }, [searchParams]);
+  }, [initialAuthView, searchParams]);
 
   function syncAuthView(view) {
     const nextUrl = view ? `/?auth=${view}` : "/";

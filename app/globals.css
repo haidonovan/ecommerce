@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  --font-space-grotesk: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --background-start: #f7f2ec;
   --background-end: #e7f3f1;
   --foreground: #15212c;

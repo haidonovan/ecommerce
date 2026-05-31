@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { fallbackProducts } from "@/lib/fallback-data";
+import { readOfflineAppState, saveOfflineAppState } from "@/lib/offline-db";
 
 const STORAGE_KEY = "grocery-store-web-state-v2";
 const AppStoreContext = createContext(null);
@@ -89,11 +90,19 @@ export function AppStoreProvider({ children }) {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setState(readStoredState());
+    let active = true;
+
+    const timer = window.setTimeout(async () => {
+      const localState = readStoredState();
+      const offlineState = await readOfflineAppState(localState);
+
+      if (active) {
+        setState(offlineState);
+      }
     }, 0);
 
     return () => {
+      active = false;
       window.clearTimeout(timer);
     };
   }, []);
@@ -138,6 +147,7 @@ export function AppStoreProvider({ children }) {
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    saveOfflineAppState(state);
   }, [state]);
 
   const value = useMemo(() => {

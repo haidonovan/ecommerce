@@ -3,19 +3,11 @@ import {
   createSessionToken,
   getSessionCookieName,
   hashPassword,
+  isAdminEmail,
   sessionCookieOptions,
 } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
-
-function isAdminEmail(email) {
-  const allowed = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  return allowed.includes(email.toLowerCase());
-}
 
 export async function POST(request) {
   try {
