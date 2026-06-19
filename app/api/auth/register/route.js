@@ -1,9 +1,12 @@
 import { fail, handleRouteError, ok } from "@/lib/api-response";
 import {
   createSessionToken,
+  getAdminPassword,
+  getCashierPassword,
   getSessionCookieName,
   hashPassword,
   isAdminEmail,
+  isCashierEmail,
   sessionCookieOptions,
 } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +33,17 @@ export async function POST(request) {
     }
 
     const passwordHash = await hashPassword(result.data.password);
-    const role = isAdminEmail(email) ? "ADMIN" : "CLIENT";
+    const configuredAdminPassword = getAdminPassword();
+    const configuredCashierPassword = getCashierPassword();
+    const canRegisterAdmin =
+      isAdminEmail(email) &&
+      configuredAdminPassword &&
+      result.data.password === configuredAdminPassword;
+    const canRegisterCashier =
+      isCashierEmail(email) &&
+      configuredCashierPassword &&
+      result.data.password === configuredCashierPassword;
+    const role = canRegisterAdmin ? "ADMIN" : canRegisterCashier ? "CASHIER" : "CLIENT";
 
     const user = await prisma.user.create({
       data: {

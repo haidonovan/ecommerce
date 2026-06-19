@@ -11,14 +11,42 @@ datasource db {
 enum UserRole {
   CLIENT
   ADMIN
+  CASHIER
 }
 
 enum OrderStatus {
   PENDING
+  CONFIRMED
   PROCESSING
+  PREPARING
+  READY
   SHIPPED
   DELIVERED
+  COMPLETED
   CANCELLED
+}
+
+enum SalesChannel {
+  POS
+  ONLINE
+}
+
+enum InventoryMovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  RESERVATION
+  SALE
+  RETURN
+  CANCELLATION
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  STOCK_CHANGE
 }
 
 enum CouponType {
@@ -50,22 +78,33 @@ model User {
 model Product {
   id              String         @id @default(cuid())
   name            String
+  sku             String?
+  barcode         String?
+  brand           String?
   category        String
   description     String
   price           Decimal        @db.Decimal(10, 2)
+  costPrice       Decimal?       @db.Decimal(10, 2)
+  wholesalePrice  Decimal?       @db.Decimal(10, 2)
   discountPercent Int            @default(0)
   discountStart   DateTime?
   discountEnd     DateTime?
   imageUrl        String
   stock           Int            @default(0)
+  minStockAlert   Int            @default(5)
   isActive        Boolean        @default(true)
   ratingAvg       Decimal        @default(0) @db.Decimal(3, 2)
   ratingCount     Int            @default(0)
   orderLines      OrderLine[]
+  saleItems       SaleItem[]
+  movements       InventoryMovement[]
   favorites       Favorite[]
   comments        Comment[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  @@unique([sku])
+  @@unique([barcode])
 }
 
 model Favorite {
@@ -82,6 +121,7 @@ model Favorite {
 model Order {
   id                String       @id @default(cuid())
   userId            String
+  channel           SalesChannel @default(ONLINE)
   shippingAddress   String
   paymentMethod     String
   subtotal          Decimal      @db.Decimal(10, 2)
@@ -97,8 +137,11 @@ model Order {
   couponDiscount    Decimal?     @db.Decimal(10, 2)
   user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   lines             OrderLine[]
+  movements         InventoryMovement[]
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+
+  @@index([channel, status, createdAt])
 }
 
 model OrderLine {
@@ -158,4 +201,93 @@ model SupportMessage {
   ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime      @default(now())
+}
+
+model Sale {
+  id            String       @id @default(cuid())
+  channel       SalesChannel @default(POS)
+  cashierUserId String?
+  cashierName   String?
+  customerId    String?
+  subtotal      Decimal      @db.Decimal(10, 2)
+  discount      Decimal      @default(0) @db.Decimal(10, 2)
+  tax           Decimal      @default(0) @db.Decimal(10, 2)
+  total         Decimal      @db.Decimal(10, 2)
+  currency      String       @default("USD")
+  synced        Boolean      @default(true)
+  items         SaleItem[]
+  payments      Payment[]
+  movements     InventoryMovement[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([channel, createdAt])
+  @@index([cashierUserId, createdAt])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String
+  name      String
+  sku       String?
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  note      String?
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  saleId    String
+  method    String
+  amount    Decimal  @db.Decimal(10, 2)
+  currency  String   @default("USD")
+  reference String?
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model InventoryMovement {
+  id            String                @id @default(cuid())
+  productId     String
+  orderId       String?
+  saleId        String?
+  type          InventoryMovementType
+  channel       SalesChannel
+  quantity      Int
+  previousStock Int
+  nextStock     Int
+  note          String?
+  userId        String?
+  product       Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order         Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  sale          Sale?                 @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  createdAt     DateTime              @default(now())
+
+  @@index([productId, createdAt])
+  @@index([channel, type, createdAt])
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String?
+  action    AuditAction
+  module    String
+  recordId  String?
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime    @default(now())
+
+  @@index([module, createdAt])
+  @@index([userId, createdAt])
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

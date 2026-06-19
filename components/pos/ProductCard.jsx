@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { formatKHR, formatUSD, toUSD } from "@/components/pos/format";
+import { formatPrimaryMoney } from "@/components/pos/format";
 
 function stockBadgeClass(stock) {
   if (stock <= 0) {
@@ -18,7 +18,6 @@ function stockBadgeClass(stock) {
 
 export function ProductCard({ product, settings, onAdd }) {
   const [pulse, setPulse] = useState(false);
-  const exchangeRate = settings.currency.exchangeRate;
   const disabled = product.stock <= 0 || product.isActive === false;
   const initial = product.name?.charAt(0)?.toUpperCase() || "?";
 
@@ -60,10 +59,7 @@ export function ProductCard({ product, settings, onAdd }) {
 
       <div className="mt-3 min-h-24">
         <p className="line-clamp-2 text-sm font-black leading-5">{product.name}</p>
-        <p className="mt-2 text-base font-black text-slate-950">{formatKHR(product.price)}</p>
-        {settings.currency.showBothCurrencies ? (
-          <p className="text-xs font-bold text-slate-500">≈ {formatUSD(toUSD(product.price, exchangeRate))}</p>
-        ) : null}
+        <p className="mt-2 text-base font-black text-slate-950">{formatPrimaryMoney(product.price, settings)}</p>
         <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-xs font-black ${stockBadgeClass(product.stock)}`}>
           {product.stock <= 0 ? "Out" : `${product.stock} left`}
         </span>

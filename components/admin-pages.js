@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   CircleDollarSign,
   ClipboardCheck,
   PackageSearch,
+  ReceiptText,
   ShieldAlert,
   Ticket,
   TrendingUp,
@@ -820,12 +821,40 @@ export function AdminInventoryPageView() {
   const lowStock = store.products.filter((product) => product.stock <= 8);
   const [csvText, setCsvText] = useState("");
   const [csvMessage, setCsvMessage] = useState("");
+  const [movements, setMovements] = useState([]);
+  const [movementMessage, setMovementMessage] = useState("");
+
+  async function loadMovements() {
+    try {
+      const response = await fetch("/api/inventory/movements?limit=30", { cache: "no-store" });
+      const payload = await response.json();
+
+      if (!response.ok || !Array.isArray(payload.data)) {
+        setMovementMessage(payload.error || "Unable to load movement history.");
+        return;
+      }
+
+      setMovements(payload.data);
+      setMovementMessage("");
+    } catch {
+      setMovementMessage("Unable to load movement history.");
+    }
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadMovements();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function handleImport() {
     const result = await store.importInventoryCsv(csvText);
     setCsvMessage(result.message);
     if (result.success) {
       setCsvText("");
+      loadMovements();
     }
   }
 
@@ -860,6 +889,50 @@ export function AdminInventoryPageView() {
             <Button onClick={handleImport}>Import Inventory</Button>
             {csvMessage ? <p className="text-sm text-[var(--muted-foreground)]">{csvMessage}</p> : null}
           </div>
+        </div>
+      </Card>
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-[var(--foreground)]">Recent stock movements</h2>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">POS sales, online reservations, and admin stock changes share this history.</p>
+          </div>
+          <Button variant="secondary" onClick={loadMovements}>Refresh</Button>
+        </div>
+        <div className="mt-4 overflow-x-auto">
+          {movements.length ? (
+            <table className="w-full min-w-[44rem] text-left text-sm">
+              <thead className="text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                <tr>
+                  <th className="px-3 py-2">Product</th>
+                  <th className="px-3 py-2">Channel</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Qty</th>
+                  <th className="px-3 py-2">Stock</th>
+                  <th className="px-3 py-2">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movements.map((movement) => (
+                  <tr key={movement.id} className="border-t border-[var(--border-soft)]">
+                    <td className="px-3 py-3">
+                      <p className="font-semibold text-[var(--foreground)]">{movement.productName}</p>
+                      <p className="mt-1 text-xs text-[var(--muted-foreground)]">{movement.sku}</p>
+                    </td>
+                    <td className="px-3 py-3 font-semibold uppercase text-[var(--foreground)]">{movement.channel}</td>
+                    <td className="px-3 py-3 capitalize text-[var(--muted-foreground)]">{movement.type.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-3 font-semibold text-[var(--foreground)]">{movement.quantity}</td>
+                    <td className="px-3 py-3 text-[var(--muted-foreground)]">{movement.previousStock} &gt; {movement.nextStock}</td>
+                    <td className="px-3 py-3 text-[var(--muted-foreground)]">{new Date(movement.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="rounded-[1.2rem] border border-dashed border-[var(--border-soft)] p-6 text-sm text-[var(--muted-foreground)]">
+              {movementMessage || "No stock movements yet."}
+            </div>
+          )}
         </div>
       </Card>
       <div className="grid gap-5 md:grid-cols-2">
@@ -920,55 +993,59 @@ export function AdminOrderManagementPageView() {
 export function AdminSalesReportPageView() {
   const store = useAppStore();
   const [range, setRange] = useState("month");
-  const revenue = store.orders.filter((order) => order.status !== "cancelled").reduce((sum, order) => sum + order.total, 0);
-  const cancelled = store.orders.filter((order) => order.status === "cancelled").reduce((sum, order) => sum + order.total, 0);
-  const average = store.orders.length ? revenue / store.orders.length : 0;
+  const [report, setReport] = useState(null);
+  const [reportMessage, setReportMessage] = useState("");
   const salesRangeConfig = useMemo(() => {
     return getDashboardRangeConfig(range, null, null);
   }, [range]);
-  const rangeOrders = useMemo(() => {
-    return filterOrdersForRange(store.orders, salesRangeConfig);
-  }, [store.orders, salesRangeConfig]);
-  const revenueSeries = useMemo(() => buildRangeSeries(rangeOrders, salesRangeConfig), [rangeOrders, salesRangeConfig]);
-  const categoryRows = useMemo(() => {
-    const totals = new Map();
-    rangeOrders.forEach((order) => {
-      if (order.status === "cancelled") {
+
+  const loadReport = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/reports/admin?range=${range}`, { cache: "no-store" });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.data) {
+        setReportMessage(payload.error || "Unable to load reports.");
         return;
       }
-      order.lines.forEach((line) => {
-        const product = store.products.find((entry) => entry.id === line.productId);
-        const category = product?.category || "Uncategorized";
-        totals.set(category, (totals.get(category) || 0) + line.unitPrice * line.quantity);
-      });
-    });
-    return Array.from(totals.entries())
-      .map(([label, value]) => ({ label, value: Number(value.toFixed(2)) }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [rangeOrders, store.products]);
-  const topProducts = useMemo(() => {
-    const totals = new Map();
-    rangeOrders.forEach((order) => {
-      if (order.status === "cancelled") {
-        return;
-      }
-      order.lines.forEach((line) => {
-        totals.set(line.productName, (totals.get(line.productName) || 0) + line.quantity);
-      });
-    });
-    return Array.from(totals.entries())
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [rangeOrders]);
-  const couponSavings = rangeOrders.reduce((sum, order) => sum + (order.couponDiscount || 0), 0);
+
+      setReport(payload.data);
+      setReportMessage("");
+    } catch {
+      setReportMessage("Unable to load reports.");
+    }
+  }, [range]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadReport();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadReport]);
+
+  const metrics = report?.metrics || {
+    totalRevenue: 0,
+    onlineRevenue: 0,
+    posRevenue: 0,
+    averageTransaction: 0,
+    cancelledValue: 0,
+    discountTotal: 0,
+    taxTotal: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
+  };
+  const revenueSeries = report?.revenueTrend?.length ? report.revenueTrend : [];
+  const categoryRows = report?.categoryRevenue || [];
+  const topProducts = report?.topProducts || [];
+  const paymentRows = report?.paymentRevenue || [];
+  const channelRows = report?.channelRevenue || [];
 
   return (
     <div className="space-y-6">
       <Card>
         <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Sales Report</p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-[var(--foreground)]">High-level reporting for revenue and order quality.</h1>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-[var(--foreground)]">Admin reports for POS and online performance.</h1>
         <div className="mt-6 flex flex-wrap gap-2">
           {dashboardRangeOptions
             .filter((option) => option.key !== "custom")
@@ -982,14 +1059,20 @@ export function AdminSalesReportPageView() {
               {option.label}
             </button>
           ))}
+          <Button variant="secondary" onClick={loadReport}>Refresh</Button>
         </div>
+        {reportMessage ? <p className="mt-4 text-sm text-red-600">{reportMessage}</p> : null}
       </Card>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={CircleDollarSign} label="Revenue" value={formatCurrency(revenue)} detail="Total non-cancelled revenue across the store." tone="success" />
-        <MetricCard icon={AlertTriangle} label="Cancelled value" value={formatCurrency(cancelled)} detail="Lost revenue from cancelled orders." tone={cancelled ? "danger" : "neutral"} />
-        <MetricCard icon={TrendingUp} label="Average order" value={formatCurrency(average)} detail="Average order value based on successful orders." tone="neutral" />
-        <MetricCard icon={Ticket} label="Coupon savings" value={formatCurrency(couponSavings)} detail={`Total discounts applied during ${salesRangeConfig.label.toLowerCase()}.`} tone="warning" />
+        <MetricCard icon={CircleDollarSign} label="Total revenue" value={formatCurrency(metrics.totalRevenue)} detail="POS and online revenue combined." tone="success" />
+        <MetricCard icon={ReceiptText} label="POS revenue" value={formatCurrency(metrics.posRevenue)} detail="In-store transactions recorded by POS." tone="neutral" />
+        <MetricCard icon={TrendingUp} label="Online revenue" value={formatCurrency(metrics.onlineRevenue)} detail="Customer storefront order revenue." tone="neutral" />
+        <MetricCard icon={AlertTriangle} label="Cancelled value" value={formatCurrency(metrics.cancelledValue)} detail="Lost revenue from cancelled online orders." tone={metrics.cancelledValue ? "danger" : "neutral"} />
+        <MetricCard icon={Ticket} label="Discounts" value={formatCurrency(metrics.discountTotal)} detail={`Discounts applied during ${salesRangeConfig.label.toLowerCase()}.`} tone="warning" />
+        <MetricCard icon={CircleDollarSign} label="Tax collected" value={formatCurrency(metrics.taxTotal)} detail="POS tax collected in this range." tone="neutral" />
+        <MetricCard icon={PackageSearch} label="Low stock" value={metrics.lowStockCount} detail="Products at or below stock alert level." tone={metrics.lowStockCount ? "warning" : "success"} />
+        <MetricCard icon={ShieldAlert} label="Out of stock" value={metrics.outOfStockCount} detail="Products currently unavailable." tone={metrics.outOfStockCount ? "danger" : "success"} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -999,7 +1082,11 @@ export function AdminSalesReportPageView() {
             <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">Range trend</h2>
           </div>
           <div className="mt-6">
-            <RevenueChart points={revenueSeries} height={200} />
+            {revenueSeries.length ? (
+              <RevenueChart points={revenueSeries} height={200} />
+            ) : (
+              <p className="text-sm leading-7 text-[var(--muted-foreground)]">No revenue has been recorded for this range yet.</p>
+            )}
           </div>
         </Card>
 
@@ -1013,6 +1100,36 @@ export function AdminSalesReportPageView() {
               <ProgressRows rows={categoryRows} formatter={(value) => formatCurrency(value)} />
             ) : (
               <p className="text-sm leading-7 text-[var(--muted-foreground)]">No revenue mix is available yet for this range.</p>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Channel breakdown</p>
+            <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">POS vs online</h2>
+          </div>
+          <div className="mt-6">
+            {channelRows.length ? (
+              <ProgressRows rows={channelRows} formatter={(value) => formatCurrency(value)} />
+            ) : (
+              <p className="text-sm leading-7 text-[var(--muted-foreground)]">No channel data yet.</p>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Payment methods</p>
+            <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">Payment mix</h2>
+          </div>
+          <div className="mt-6">
+            {paymentRows.length ? (
+              <ProgressRows rows={paymentRows} formatter={(value) => formatCurrency(value)} />
+            ) : (
+              <p className="text-sm leading-7 text-[var(--muted-foreground)]">No payment data yet.</p>
             )}
           </div>
         </Card>

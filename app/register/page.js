@@ -1,16 +1,12 @@
 import { redirect } from "next/navigation";
 
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getDefaultRouteForRole } from "@/lib/auth";
 
 export default async function RegisterPage() {
   const user = await getCurrentUser({ suppressDatabaseErrors: true });
 
-  if (user?.role === "ADMIN") {
-    redirect("/admin");
-  }
-
-  if (user?.role === "CLIENT") {
-    redirect("/client");
+  if (user?.role) {
+    redirect(getDefaultRouteForRole(user.role));
   }
 
   redirect("/?auth=register");

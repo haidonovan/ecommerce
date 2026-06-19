@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ClientShell } from "@/components/client-shell";
-import { getCurrentUser } from "@/lib/auth";
+import { canAccessClient, getCurrentUser, getDefaultRouteForRole } from "@/lib/auth";
 
 export default async function ClientIndexPage() {
   const user = await getCurrentUser({ suppressDatabaseErrors: true });
@@ -10,8 +10,8 @@ export default async function ClientIndexPage() {
     redirect("/login");
   }
 
-  if (user.role === "ADMIN") {
-    redirect("/admin");
+  if (!canAccessClient(user.role)) {
+    redirect(getDefaultRouteForRole(user.role));
   }
 
   return <ClientShell user={user} />;

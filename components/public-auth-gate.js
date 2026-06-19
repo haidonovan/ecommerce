@@ -9,8 +9,6 @@ import {
   EyeOff,
   Heart,
   Search,
-  ShieldCheck,
-  User,
 } from "lucide-react";
 
 import { EntranceMotion } from "@/components/motion/entrance-motion";
@@ -57,6 +55,18 @@ const INITIAL_PUBLIC_QUICK_FILTERS = {
   topRated: false,
   bulkBuy: false,
 };
+
+function getRoleRedirect(role) {
+  if (role === "ADMIN") {
+    return "/admin";
+  }
+
+  if (role === "CASHIER") {
+    return "/pos";
+  }
+
+  return "/client";
+}
 
 function SurfaceCard({ children, className = "" }) {
   return (
@@ -377,7 +387,7 @@ function ClientLoginForm({ onSubmit, onSwitchToRegister, loading }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <h2 className="text-3xl font-semibold text-[var(--foreground)]">Welcome back</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Sign in to continue shopping.</p>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Sign in once and we will open the right system for your role.</p>
       </div>
 
       <div>
@@ -531,66 +541,6 @@ function RegisterForm({ onSubmit, onSwitchToLogin, loading }) {
   );
 }
 
-function AdminLoginForm({ onSubmit, loading }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-
-    if (!email.trim()) {
-      setError("Enter admin email");
-      return;
-    }
-    if (!password) {
-      setError("Enter password");
-      return;
-    }
-
-    setError("");
-    const nextError = await onSubmit(email.trim(), password);
-    if (nextError) {
-      setError(nextError);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <h2 className="text-3xl font-semibold text-[var(--foreground)]">Admin login</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Manage product inventory, restocking, orders, and sales.</p>
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">Admin email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="app-input px-4 py-3"
-        />
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="app-input px-4 py-3"
-        />
-      </div>
-
-      {error ? <AuthNotice tone="error">{error}</AuthNotice> : null}
-
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Please wait..." : "Login as admin"}
-      </Button>
-    </form>
-  );
-}
-
 export function PublicAuthGate({ initialAuthView = "" }) {
   const store = useAppStore();
   const pathname = usePathname();
@@ -734,8 +684,8 @@ export function PublicAuthGate({ initialAuthView = "" }) {
   useEffect(() => {
     const authView = searchParams.get("auth") || initialAuthView;
 
-    if (authView === "admin") {
-      setRoleTab("admin");
+    if (authView === "admin" || authView === "login") {
+      setRoleTab("client");
       setShowRegister(false);
       setShowPublicShop(false);
       return;
@@ -744,13 +694,6 @@ export function PublicAuthGate({ initialAuthView = "" }) {
     if (authView === "register") {
       setRoleTab("client");
       setShowRegister(true);
-      setShowPublicShop(false);
-      return;
-    }
-
-    if (authView === "login") {
-      setRoleTab("client");
-      setShowRegister(false);
       setShowPublicShop(false);
       return;
     }
@@ -841,7 +784,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
         return data.error || "Unable to continue.";
       }
 
-      router.push(redirectTo);
+      router.push(redirectTo || getRoleRedirect(data.user?.role));
       router.refresh();
       return "";
     } catch {
@@ -852,7 +795,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
     }
 
   const showingPublicShop = roleTab === "client" && showPublicShop;
-  const authKey = roleTab === "admin" ? "admin-login" : showRegister ? "register" : "login";
+  const authKey = showRegister ? "register" : "login";
   const viewKey = showingPublicShop ? "public-shop" : authKey;
 
   return (
@@ -1161,47 +1104,6 @@ export function PublicAuthGate({ initialAuthView = "" }) {
                       <ThemeToggle />
                     </div>
 
-                    <div className="app-card-inset mb-4 grid grid-cols-2 gap-2 p-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRoleTab("client");
-                          setShowRegister(false);
-                          setShowPublicShop(true);
-                          setNotice("");
-                          syncAuthView("");
-                        }}
-                        className={cn(
-                          "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition",
-                          roleTab === "client"
-                            ? "bg-[var(--surface)] text-[var(--foreground)] shadow-[var(--shadow-soft)]"
-                            : "text-[var(--muted-foreground)]",
-                        )}
-                      >
-                        <User className="size-4" />
-                        Client
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRoleTab("admin");
-                          setShowRegister(false);
-                          setShowPublicShop(false);
-                          setNotice("");
-                          syncAuthView("admin");
-                        }}
-                        className={cn(
-                          "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition",
-                          roleTab === "admin"
-                            ? "bg-[var(--surface)] text-[var(--foreground)] shadow-[var(--shadow-soft)]"
-                            : "text-[var(--muted-foreground)]",
-                        )}
-                      >
-                        <ShieldCheck className="size-4" />
-                        Admin
-                      </button>
-                    </div>
-
                     {loading ? <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-[var(--surface-quiet)]"><div className="h-full w-1/2 animate-pulse rounded-full bg-[var(--action)]" /></div> : null}
                     {notice ? <div className="mb-4"><AuthNotice>{notice}</AuthNotice></div> : null}
 
@@ -1213,14 +1115,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
                         exit={{ opacity: 0, x: 10, scale: 0.97 }}
                         transition={{ duration: 0.42, ease: easeInOutCubic }}
                       >
-                        {roleTab === "admin" ? (
-                          <AdminLoginForm
-                            loading={loading}
-                            onSubmit={(email, password) =>
-                              submitAuth("/api/auth/login", { email, password, roleHint: "admin" }, "/admin")
-                            }
-                          />
-                        ) : showRegister ? (
+                        {showRegister ? (
                           <RegisterForm
                             loading={loading}
                             onSwitchToLogin={() => {
@@ -1239,26 +1134,24 @@ export function PublicAuthGate({ initialAuthView = "" }) {
                               syncAuthView("register");
                             }}
                             onSubmit={(email, password) =>
-                              submitAuth("/api/auth/login", { email, password, roleHint: "client" }, "/client")
+                              submitAuth("/api/auth/login", { email, password })
                             }
                           />
                         )}
                       </motion.div>
                     </AnimatePresence>
 
-                    {roleTab === "client" ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPublicShop(true);
-                          setNotice("");
-                          syncAuthView("");
-                        }}
-                        className="mt-4 text-sm font-medium text-[var(--foreground)]"
-                      >
-                        Browse products without login
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPublicShop(true);
+                        setNotice("");
+                        syncAuthView("");
+                      }}
+                      className="mt-4 text-sm font-medium text-[var(--foreground)]"
+                    >
+                      Browse products without login
+                    </button>
                   </SurfaceCard>
                 </EntranceMotion>
               </div>

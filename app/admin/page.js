@@ -7,11 +7,11 @@ export default async function AdminIndexPage() {
   const user = await getCurrentUser({ suppressDatabaseErrors: true });
 
   if (!user) {
-    redirect("/?auth=admin");
+    redirect("/login");
   }
 
   if (user.role !== "ADMIN") {
-    redirect("/client");
+    redirect("/login");
   }
 
   return <AdminShell user={user} />;

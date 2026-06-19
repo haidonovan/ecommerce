@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { formatKHR, formatMoney, formatUSD, toKHR, toUSD } from "@/components/pos/format";
+import { convertMoney, formatDisplayMoney, formatMoney } from "@/components/pos/format";
 
 const keypad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "000", "0", "back"];
 
@@ -11,14 +11,17 @@ export function PaymentModal({ open, summary, settings, displayCurrency, cashier
   const [cashInput, setCashInput] = useState("");
   const [reference, setReference] = useState("");
   const exchangeRate = settings.currency.exchangeRate;
+  const money = (value, showBoth = true) => formatDisplayMoney(value, displayCurrency, settings, showBoth);
+  const showBothCurrencies = Boolean(settings.currency.showBothCurrencies);
 
-  const cashReceivedKHR = useMemo(() => {
+  const cashReceivedUSD = useMemo(() => {
     const rawValue = Number(cashInput || 0);
-    return displayCurrency === "USD" ? toKHR(rawValue, exchangeRate) : rawValue;
+    return convertMoney(rawValue, displayCurrency, "USD", exchangeRate);
   }, [cashInput, displayCurrency, exchangeRate]);
 
-  const changeDue = Math.max(0, cashReceivedKHR - summary.total);
-  const canConfirmCash = cashReceivedKHR >= summary.total;
+  const changeDue = Math.max(0, cashReceivedUSD - summary.total);
+  const canConfirmCash = cashReceivedUSD >= summary.total;
+  const quickAmounts = [summary.total, 5, 10, 20, 50, 100];
 
   if (!open) {
     return null;
@@ -33,14 +36,15 @@ export function PaymentModal({ open, summary, settings, displayCurrency, cashier
     setCashInput((value) => `${value}${key}`);
   }
 
-  function setQuickAmount(amountKHR) {
-    setCashInput(String(displayCurrency === "USD" ? Number(toUSD(amountKHR, exchangeRate).toFixed(2)) : amountKHR));
+  function setQuickAmount(amountUSD) {
+    const displayAmount = convertMoney(amountUSD, "USD", displayCurrency, exchangeRate);
+    setCashInput(String(displayCurrency === "USD" ? Number(displayAmount.toFixed(2)) : Math.round(displayAmount)));
   }
 
   function confirm() {
     onConfirm({
       paymentMethod: method,
-      cashReceived: method === "cash" ? cashReceivedKHR : summary.total,
+      cashReceived: method === "cash" ? cashReceivedUSD : summary.total,
       changeDue: method === "cash" ? changeDue : 0,
       reference,
       cashierName,
@@ -66,13 +70,12 @@ export function PaymentModal({ open, summary, settings, displayCurrency, cashier
             <h3 className="font-black">Order Summary</h3>
             <div className="mt-4 space-y-2 text-sm font-bold">
               <div className="flex justify-between"><span>Items</span><span>{summary.itemCount}</span></div>
-              <div className="flex justify-between"><span>Subtotal</span><span>{formatKHR(summary.subtotal)}</span></div>
-              <div className="flex justify-between text-emerald-700"><span>Discount</span><span>-{formatKHR(summary.discount)}</span></div>
-              <div className="flex justify-between"><span>{settings.tax.taxName}</span><span>{formatKHR(summary.tax)}</span></div>
+              <div className="flex justify-between"><span>Subtotal</span><span>{money(summary.subtotal)}</span></div>
+              <div className="flex justify-between text-emerald-700"><span>Discount</span><span>-{money(summary.discount)}</span></div>
+              <div className="flex justify-between"><span>{settings.tax.taxName}</span><span>{money(summary.tax)}</span></div>
               <div className="flex justify-between border-t border-slate-200 pt-3 text-xl font-black">
-                <span>Total</span><span>{formatKHR(summary.total)}</span>
+                <span>Total</span><span>{money(summary.total)}</span>
               </div>
-              <p className="text-slate-500">{formatUSD(toUSD(summary.total, exchangeRate))}</p>
             </div>
           </section>
 
@@ -95,16 +98,16 @@ export function PaymentModal({ open, summary, settings, displayCurrency, cashier
                 <div>
                   <p className="text-sm font-bold text-slate-500">Cash Received</p>
                   <p className="mt-2 rounded-2xl bg-slate-950 px-4 py-4 text-3xl font-black text-white">
-                    {cashInput ? formatMoney(displayCurrency === "USD" ? Number(cashInput) : Number(cashInput), displayCurrency, exchangeRate) : "0"}
+                    {cashInput ? formatMoney(Number(cashInput), displayCurrency, exchangeRate, showBothCurrencies) : "0"}
                   </p>
                   <p className={changeDue >= 0 ? "mt-4 text-2xl font-black text-emerald-700" : "mt-4 text-2xl font-black text-red-700"}>
-                    Change Due: {formatKHR(changeDue)} ({formatUSD(toUSD(changeDue, exchangeRate))})
+                    Change Due: {money(changeDue)}
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {[summary.total, 5000, 10000, 20000, 4100, 20500, 41000].map((amount) => (
+                    {quickAmounts.map((amount) => (
                       <button key={amount} type="button" onClick={() => setQuickAmount(amount)} className="rounded-full bg-slate-100 px-4 py-2 text-sm font-black">
-                        {amount === summary.total ? "Exact" : formatKHR(amount)}
+                        {amount === summary.total ? "Exact" : money(amount, false)}
                       </button>
                     ))}
                   </div>

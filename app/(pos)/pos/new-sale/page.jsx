@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { CartItem } from "@/components/pos/CartItem";
-import { formatKHR, formatMoney, formatUSD, toUSD } from "@/components/pos/format";
+import { convertMoney, formatDisplayMoney } from "@/components/pos/format";
 import { PaymentModal } from "@/components/pos/PaymentModal";
 import { ProductCard } from "@/components/pos/ProductCard";
 import { ReceiptView } from "@/components/pos/ReceiptView";
@@ -13,14 +13,14 @@ import { addToQueue, getAll, put } from "@/lib/db";
 import { usePosStore } from "@/store/posStore";
 
 const mockProducts = [
-  { id: "angkor-rice", name: "Angkor Premium Jasmine Rice 5kg", sku: "RICE-001", category: "Rice", price: 32000, stock: 18, image: "", isActive: true },
-  { id: "kampot-pepper", name: "Kampot Black Pepper 100g", sku: "SPICE-004", category: "Spices", price: 22000, stock: 8, image: "", isActive: true },
-  { id: "iced-coffee", name: "Cambodian Iced Coffee", sku: "DRINK-010", category: "Drinks", price: 4000, stock: 24, image: "", isActive: true },
-  { id: "fish-sauce", name: "Fish Sauce Bottle", sku: "SAUCE-002", category: "Sauce", price: 6500, stock: 5, image: "", isActive: true },
-  { id: "palm-sugar", name: "Palm Sugar 500g", sku: "SWEET-003", category: "Grocery", price: 9000, stock: 3, image: "", isActive: true },
-  { id: "nom-banh-chok", name: "Fresh Nom Banh Chok Noodles", sku: "NOOD-008", category: "Noodles", price: 5500, stock: 0, image: "", isActive: true },
-  { id: "coconut-water", name: "Fresh Coconut Water", sku: "DRINK-011", category: "Drinks", price: 5000, stock: 14, image: "", isActive: true },
-  { id: "banana-chips", name: "Banana Chips Pack", sku: "SNACK-020", category: "Snacks", price: 7500, stock: 11, image: "", isActive: true },
+  { id: "angkor-rice", name: "Angkor Premium Jasmine Rice 5kg", sku: "RICE-001", category: "Rice", price: 7.8, stock: 18, image: "", isActive: true },
+  { id: "kampot-pepper", name: "Kampot Black Pepper 100g", sku: "SPICE-004", category: "Spices", price: 5.37, stock: 8, image: "", isActive: true },
+  { id: "iced-coffee", name: "Cambodian Iced Coffee", sku: "DRINK-010", category: "Drinks", price: 0.98, stock: 24, image: "", isActive: true },
+  { id: "fish-sauce", name: "Fish Sauce Bottle", sku: "SAUCE-002", category: "Sauce", price: 1.59, stock: 5, image: "", isActive: true },
+  { id: "palm-sugar", name: "Palm Sugar 500g", sku: "SWEET-003", category: "Grocery", price: 2.2, stock: 3, image: "", isActive: true },
+  { id: "nom-banh-chok", name: "Fresh Nom Banh Chok Noodles", sku: "NOOD-008", category: "Noodles", price: 1.34, stock: 0, image: "", isActive: true },
+  { id: "coconut-water", name: "Fresh Coconut Water", sku: "DRINK-011", category: "Drinks", price: 1.22, stock: 14, image: "", isActive: true },
+  { id: "banana-chips", name: "Banana Chips Pack", sku: "SNACK-020", category: "Snacks", price: 1.83, stock: 11, image: "", isActive: true },
 ];
 
 function createTransactionId() {
@@ -67,7 +67,7 @@ export default function NewSalePage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [lastSynced, setLastSynced] = useState("Never");
-  const [displayCurrency, setDisplayCurrency] = useState("KHR");
+  const [displayCurrency, setDisplayCurrency] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState("percent");
@@ -159,12 +159,13 @@ export default function NewSalePage() {
   const taxBase = Math.max(0, subtotal - appliedDiscount.amount);
   const tax = settings.tax.enabled
     ? settings.tax.taxType === "inclusive"
-      ? Math.round(taxBase - taxBase / (1 + settings.tax.taxRate / 100))
-      : Math.round(taxBase * (settings.tax.taxRate / 100))
+      ? Number((taxBase - taxBase / (1 + settings.tax.taxRate / 100)).toFixed(2))
+      : Number((taxBase * (settings.tax.taxRate / 100)).toFixed(2))
     : 0;
-  const total = Math.max(0, taxBase + (settings.tax.enabled && settings.tax.taxType === "exclusive" ? tax : 0));
+  const total = Number(Math.max(0, taxBase + (settings.tax.enabled && settings.tax.taxType === "exclusive" ? tax : 0)).toFixed(2));
   const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
-  const exchangeRate = settings.currency.exchangeRate;
+  const activeDisplayCurrency = displayCurrency || settings.currency.primaryCurrency || "USD";
+  const money = (value, showBoth = true) => formatDisplayMoney(value, activeDisplayCurrency, settings, showBoth);
 
   function applyDiscount(value = discountValue, type = discountType) {
     const numericValue = Number(value || 0);
@@ -180,11 +181,20 @@ export default function NewSalePage() {
         return;
       }
 
-      setAppliedDiscount({ type, value: numericValue, amount: Math.round(subtotal * (numericValue / 100)) });
+      setAppliedDiscount({
+        type,
+        value: numericValue,
+        amount: Number((subtotal * (numericValue / 100)).toFixed(2)),
+      });
       return;
     }
 
-    setAppliedDiscount({ type, value: numericValue, amount: Math.min(numericValue, subtotal) });
+    const discountAmountUsd = convertMoney(numericValue, activeDisplayCurrency, "USD", settings.currency.exchangeRate);
+    setAppliedDiscount({
+      type,
+      value: numericValue,
+      amount: Number(Math.min(discountAmountUsd, subtotal).toFixed(2)),
+    });
   }
 
   async function confirmPayment(payment) {
@@ -243,7 +253,7 @@ export default function NewSalePage() {
   }
 
   const checkoutPanel = (
-    <aside className="flex h-full min-h-0 flex-col rounded-t-3xl border border-slate-200 bg-white p-4 shadow-xl md:rounded-3xl">
+    <aside className="flex h-full min-h-0 flex-col rounded-t-3xl border border-slate-200 bg-white p-3.5 shadow-xl md:rounded-3xl">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-black">New Sale</h2>
@@ -272,14 +282,14 @@ export default function NewSalePage() {
         </div>
       </div>
 
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="mt-3 min-h-[26rem] flex-1 space-y-2 overflow-y-auto pr-1">
         {cart.length ? (
           cart.map((item) => (
             <CartItem
               key={item.productId}
               item={item}
               settings={settings}
-              displayCurrency={displayCurrency}
+              displayCurrency={activeDisplayCurrency}
               onUpdateQty={(qty) => updateQty(item.productId, qty)}
               onRemove={() => removeFromCart(item.productId)}
               onUpdateNote={(note) => updateItemNote(item.productId, note)}
@@ -292,14 +302,14 @@ export default function NewSalePage() {
         )}
       </div>
 
-      <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
-        <div className="flex justify-between text-sm font-bold"><span>Subtotal</span><span>{formatKHR(subtotal)}</span></div>
-        {appliedDiscount.amount > 0 ? <div className="flex justify-between text-sm font-bold text-emerald-700"><span>Discount</span><span>-{formatKHR(appliedDiscount.amount)}</span></div> : null}
-        {settings.tax.enabled ? <div className="flex justify-between text-sm font-bold"><span>{settings.tax.taxName}</span><span>{formatKHR(tax)}</span></div> : null}
-        <div className="flex justify-between text-2xl font-black"><span>Total</span><span>{formatKHR(total)}</span></div>
-        <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+      <div className="mt-3 shrink-0 space-y-2 border-t border-slate-200 pt-3">
+        <div className="flex justify-between text-sm font-bold leading-5"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+        {appliedDiscount.amount > 0 ? <div className="flex justify-between text-sm font-bold leading-5 text-emerald-700"><span>Discount</span><span>-{money(appliedDiscount.amount)}</span></div> : null}
+        {settings.tax.enabled ? <div className="flex justify-between text-sm font-bold leading-5"><span>{settings.tax.taxName}</span><span>{money(tax)}</span></div> : null}
+        <div className="flex justify-between gap-3 text-xl font-black leading-7"><span>Total</span><span className="text-right">{money(total)}</span></div>
+        <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1">
           {["KHR", "USD"].map((currency) => (
-            <button key={currency} type="button" onClick={() => setDisplayCurrency(currency)} className={displayCurrency === currency ? "rounded-xl bg-white py-2 text-sm font-black shadow-sm" : "py-2 text-sm font-black text-slate-600"}>
+            <button key={currency} type="button" onClick={() => setDisplayCurrency(currency)} className={activeDisplayCurrency === currency ? "rounded-lg bg-white py-1.5 text-sm font-black shadow-sm" : "py-1.5 text-sm font-black text-slate-600"}>
               {currency}
             </button>
           ))}
@@ -310,34 +320,36 @@ export default function NewSalePage() {
             Add Discount
           </button>
           {discountOpen ? (
-            <div className="mt-3 rounded-2xl bg-slate-50 p-3">
-              <div className="grid grid-cols-2 gap-2">
-                {["percent", "fixed"].map((type) => (
-                  <button key={type} type="button" onClick={() => setDiscountType(type)} className={discountType === type ? "rounded-xl bg-slate-900 py-2 text-sm font-black text-white" : "rounded-xl bg-white py-2 text-sm font-black"}>
-                    {type === "percent" ? "%" : "Fixed"}
-                  </button>
-                ))}
+            <div className="mt-2 rounded-2xl bg-slate-50 p-2.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                <div className="grid grid-cols-2 gap-1.5">
+                  {["percent", "fixed"].map((type) => (
+                    <button key={type} type="button" onClick={() => setDiscountType(type)} className={discountType === type ? "rounded-lg bg-slate-900 py-2 text-sm font-black text-white" : "rounded-lg bg-white py-2 text-sm font-black"}>
+                      {type === "percent" ? "%" : "Fixed"}
+                    </button>
+                  ))}
+                </div>
+                <input value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} type="number" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold outline-none" />
               </div>
-              <input value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} type="number" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-bold outline-none" />
               {discountType === "percent" && Number(discountValue || 0) > Number(settings.discount.managerPinThresholdPercent || 0) ? (
-                <input value={managerPin} onChange={(event) => setManagerPin(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="Manager PIN" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-bold outline-none" />
+                <input value={managerPin} onChange={(event) => setManagerPin(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="Manager PIN" className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold outline-none" />
               ) : null}
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {settings.discount.presets.map((preset) => (
-                  <button key={preset} type="button" onClick={() => applyDiscount(preset, "percent")} className="rounded-full bg-white px-3 py-1.5 text-xs font-black">
+                  <button key={preset} type="button" onClick={() => applyDiscount(preset, "percent")} className="rounded-full bg-white px-3 py-1 text-xs font-black">
                     {preset}%
                   </button>
                 ))}
+                <button type="button" onClick={() => applyDiscount()} className="ml-auto rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-black text-white">
+                  Apply
+                </button>
               </div>
-              <button type="button" onClick={() => applyDiscount()} className="mt-3 w-full rounded-xl bg-emerald-600 py-2 text-sm font-black text-white">
-                Apply Discount
-              </button>
             </div>
           ) : null}
         </div>
 
-        <button type="button" disabled={!cart.length} onClick={() => setPaymentOpen(true)} className="w-full rounded-2xl bg-emerald-600 px-4 py-4 text-lg font-black text-white disabled:bg-slate-300">
-          Charge {formatKHR(total)} {settings.currency.showBothCurrencies ? `(~${formatUSD(toUSD(total, exchangeRate))})` : ""}
+        <button type="button" disabled={!cart.length} onClick={() => setPaymentOpen(true)} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-black text-white disabled:bg-slate-300">
+          Charge {money(total)}
         </button>
       </div>
     </aside>
@@ -390,7 +402,7 @@ export default function NewSalePage() {
 
       {cart.length ? (
         <button type="button" onClick={() => setDrawerOpen(true)} className="fixed bottom-4 left-4 right-4 z-40 rounded-2xl bg-emerald-600 px-4 py-4 text-lg font-black text-white shadow-xl md:hidden">
-          View Cart · {itemCount} items · {formatKHR(total)}
+          View Cart - {itemCount} items - {money(total, false)}
         </button>
       ) : null}
 
@@ -399,7 +411,7 @@ export default function NewSalePage() {
           className="fixed inset-0 z-50 flex items-end bg-slate-950/50 md:hidden"
           onClick={() => setDrawerOpen(false)}
         >
-          <div className="max-h-[88dvh] w-full" onClick={(event) => event.stopPropagation()}>
+          <div className="max-h-[96dvh] w-full" onClick={(event) => event.stopPropagation()}>
             {checkoutPanel}
           </div>
         </div>
@@ -409,7 +421,7 @@ export default function NewSalePage() {
         open={paymentOpen}
         summary={{ subtotal, tax, discount: appliedDiscount.amount, total, itemCount }}
         settings={settings}
-        displayCurrency={displayCurrency}
+        displayCurrency={activeDisplayCurrency}
         cashierName={cashierName}
         onClose={() => setPaymentOpen(false)}
         onConfirm={confirmPayment}

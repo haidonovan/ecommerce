@@ -1,9 +1,9 @@
-import { AdminLoginForm } from "@/components/admin-login-form";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Admin Login",
+  title: "Login",
 };
 
 export default function AdminLoginPage() {
-  return <AdminLoginForm />;
+  redirect("/login");
 }

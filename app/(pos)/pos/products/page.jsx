@@ -2,27 +2,31 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { formatKHR, formatUSD, toUSD } from "@/components/pos/format";
+import { convertMoney, formatMoney, formatPrimaryMoney } from "@/components/pos/format";
 import { ProductFormModal } from "@/components/pos/ProductFormModal";
 import { useOffline } from "@/hooks/useOffline";
 import { usePOSSettings } from "@/hooks/usePOSSettings";
 import { clearStore, getAll, put, remove } from "@/lib/db";
 
 const mockProducts = [
-  { id: "angkor-rice", name: "Angkor Premium Jasmine Rice", sku: "RICE-001", category: "Grocery", price: 32000, stock: 18, lowStockThreshold: 5, unit: "bag", image: "", isActive: true, createdAt: "2026-01-01T01:00:00Z" },
-  { id: "coconut-water", name: "Fresh Coconut Water", sku: "DRINK-011", category: "Beverages", price: 5000, stock: 14, lowStockThreshold: 5, unit: "bottle", image: "", isActive: true, createdAt: "2026-01-02T01:00:00Z" },
-  { id: "banana-chips", name: "Banana Chips Pack", sku: "SNACK-020", category: "Snacks", price: 7500, stock: 2, lowStockThreshold: 5, unit: "pack", image: "", isActive: true, createdAt: "2026-01-03T01:00:00Z" },
-  { id: "fish-sauce", name: "Fish Sauce Bottle", sku: "SAUCE-002", category: "Sauce", price: 6500, stock: 0, lowStockThreshold: 5, unit: "bottle", image: "", isActive: false, createdAt: "2026-01-04T01:00:00Z" },
+  { id: "angkor-rice", name: "Angkor Premium Jasmine Rice", sku: "RICE-001", category: "Grocery", price: 7.8, stock: 18, lowStockThreshold: 5, unit: "bag", image: "", isActive: true, createdAt: "2026-01-01T01:00:00Z" },
+  { id: "coconut-water", name: "Fresh Coconut Water", sku: "DRINK-011", category: "Beverages", price: 1.22, stock: 14, lowStockThreshold: 5, unit: "bottle", image: "", isActive: true, createdAt: "2026-01-02T01:00:00Z" },
+  { id: "banana-chips", name: "Banana Chips Pack", sku: "SNACK-020", category: "Snacks", price: 1.83, stock: 2, lowStockThreshold: 5, unit: "pack", image: "", isActive: true, createdAt: "2026-01-03T01:00:00Z" },
+  { id: "fish-sauce", name: "Fish Sauce Bottle", sku: "SAUCE-002", category: "Sauce", price: 1.59, stock: 0, lowStockThreshold: 5, unit: "bottle", image: "", isActive: false, createdAt: "2026-01-04T01:00:00Z" },
 ];
 
-function normalizeProduct(product) {
+function normalizeProduct(product, exchangeRate = 4100) {
+  const price = product.price !== undefined && product.price !== ""
+    ? Number(product.price)
+    : convertMoney(product.price_khr, "KHR", "USD", exchangeRate);
+
   return {
     id: product.id || `prd-${Date.now()}`,
     name: product.name || "Unnamed Product",
     sku: product.sku || product.id || "",
     description: product.description || "",
     category: product.category || "General",
-    price: Number(product.price || product.price_khr || 0),
+    price: Number(price || 0),
     stock: Number(product.stock || 0),
     lowStockThreshold: Number(product.lowStockThreshold || 5),
     unit: product.unit || "pcs",
@@ -45,7 +49,7 @@ function stockLabel(product) {
   return <span className="font-black text-emerald-700">{product.stock.toLocaleString()}</span>;
 }
 
-function parseCsv(text) {
+function parseCsv(text, exchangeRate = 4100) {
   const lines = text.split(/\r?\n/).filter(Boolean);
   const headers = lines[0]?.split(",").map((header) => header.trim().toLowerCase()) || [];
 
@@ -57,9 +61,10 @@ function parseCsv(text) {
       name: row.name,
       sku: row.sku,
       category: row.category,
-      price: row.price_khr,
+      price: row.price || row.price_usd,
+      price_khr: row.price_khr,
       stock: row.stock,
-    });
+    }, exchangeRate);
 
     return {
       ...product,
@@ -87,6 +92,13 @@ export default function PosProductsPage() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [csvRows, setCsvRows] = useState([]);
   const [importResult, setImportResult] = useState("");
+  const primaryCurrency = settings.currency.primaryCurrency || "USD";
+  const secondaryCurrency = primaryCurrency === "USD" ? "KHR" : "USD";
+
+  function formatSecondaryPrice(value) {
+    const converted = convertMoney(value, "USD", secondaryCurrency, settings.currency.exchangeRate);
+    return formatMoney(converted, secondaryCurrency, settings.currency.exchangeRate, false);
+  }
 
   useEffect(() => {
     let active = true;
@@ -94,7 +106,7 @@ export default function PosProductsPage() {
     async function loadProducts() {
       const localProducts = await getAll("products");
       if (active && Array.isArray(localProducts) && localProducts.length) {
-        setProducts(localProducts.map(normalizeProduct));
+        setProducts(localProducts.map((product) => normalizeProduct(product, settings.currency.exchangeRate)));
       }
       setLastSynced(window.localStorage.getItem("pos-products-last-synced") || "Never");
 
@@ -111,6 +123,7 @@ export default function PosProductsPage() {
       active = false;
     };
     // syncProducts intentionally stays out of deps so initial online refresh runs once per online state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline]);
 
   const categories = useMemo(() => ["All", ...new Set(products.map((product) => product.category))], [products]);
@@ -168,7 +181,7 @@ export default function PosProductsPage() {
       }
       const payload = await response.json();
       const rawProducts = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
-      const nextProducts = rawProducts.map(normalizeProduct);
+      const nextProducts = rawProducts.map((product) => normalizeProduct(product, settings.currency.exchangeRate));
       if (nextProducts.length) {
         await persistProducts(nextProducts);
         const timestamp = new Date().toLocaleString();
@@ -197,8 +210,8 @@ export default function PosProductsPage() {
 
     const nextProducts =
       mode === "edit"
-        ? products.map((entry) => (entry.id === product.id ? normalizeProduct(product) : entry))
-        : [normalizeProduct(product), ...products];
+        ? products.map((entry) => (entry.id === product.id ? normalizeProduct(product, settings.currency.exchangeRate) : entry))
+        : [normalizeProduct(product, settings.currency.exchangeRate), ...products];
     await persistProducts(nextProducts);
     setModalOpen(false);
   }
@@ -252,7 +265,7 @@ export default function PosProductsPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = () => setCsvRows(parseCsv(String(reader.result || "")));
+    reader.onload = () => setCsvRows(parseCsv(String(reader.result || ""), settings.currency.exchangeRate));
     reader.readAsText(file);
   }
 
@@ -266,7 +279,7 @@ export default function PosProductsPage() {
       });
     } catch {}
 
-    const nextProducts = [...validRows.map(normalizeProduct), ...products];
+    const nextProducts = [...validRows.map((product) => normalizeProduct(product, settings.currency.exchangeRate)), ...products];
     await persistProducts(nextProducts);
     setImportResult(`Imported ${validRows.length} rows. ${csvRows.length - validRows.length} errors.`);
     setCsvRows([]);
@@ -341,7 +354,7 @@ export default function PosProductsPage() {
               <tbody>
                 {csvRows.map((row) => (
                   <tr key={row.rowNumber} className={row.errors.length ? "bg-red-50" : ""}>
-                    <td className="px-3 py-2 font-bold">{row.rowNumber}</td><td>{row.name}</td><td>{row.sku}</td><td>{row.category}</td><td>{formatKHR(row.price)}</td><td>{row.stock}</td><td className="text-red-700">{row.errors.join(", ")}</td>
+                    <td className="px-3 py-2 font-bold">{row.rowNumber}</td><td>{row.name}</td><td>{row.sku}</td><td>{row.category}</td><td>{formatPrimaryMoney(row.price, settings, false)}</td><td>{row.stock}</td><td className="text-red-700">{row.errors.join(", ")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -358,7 +371,7 @@ export default function PosProductsPage() {
               <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
                 <tr>
                   <th className="px-4 py-3"><input type="checkbox" checked={selectedIds.length === visibleProducts.length && visibleProducts.length > 0} onChange={(event) => setSelectedIds(event.target.checked ? visibleProducts.map((product) => product.id) : [])} /></th>
-                  <th className="px-4 py-3">Image</th><th className="px-4 py-3">Name + SKU</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Price (KHR)</th><th className="px-4 py-3">Price (USD)</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th>
+                  <th className="px-4 py-3">Image</th><th className="px-4 py-3">Name + SKU</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Display ({primaryCurrency})</th><th className="px-4 py-3">Converted ({secondaryCurrency})</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -368,8 +381,8 @@ export default function PosProductsPage() {
                     <td className="px-4 py-3"><div className="flex size-10 items-center justify-center rounded-xl bg-slate-200 bg-cover bg-center font-black text-slate-500" style={product.image ? { backgroundImage: `url(${product.image})` } : undefined}>{product.image ? "" : product.name.charAt(0)}</div></td>
                     <td className="px-4 py-3"><p className="font-black">{product.name}</p><p className="text-xs font-bold text-slate-500">{product.sku}</p></td>
                     <td className="px-4 py-3 font-bold text-slate-600">{product.category}</td>
-                    <td className="px-4 py-3 font-black">{formatKHR(product.price)}</td>
-                    <td className="px-4 py-3 font-bold text-slate-600">{formatUSD(toUSD(product.price, settings.currency.exchangeRate))}</td>
+                    <td className="px-4 py-3 font-black">{formatPrimaryMoney(product.price, settings, false)}</td>
+                    <td className="px-4 py-3 font-bold text-slate-600">{formatSecondaryPrice(product.price)}</td>
                     <td className="px-4 py-3">{stockLabel(product)}</td>
                     <td className="px-4 py-3"><span className={product.isActive ? "rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700" : "rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500"}>{product.isActive ? "Active" : "Inactive"}</span></td>
                     <td className="px-4 py-3"><div className="flex gap-2"><button type="button" onClick={() => openEdit(product)} className="rounded-xl bg-slate-100 px-3 py-2 font-black">✎</button><button type="button" onClick={() => window.confirm("Delete this product?") && deleteProducts([product.id])} className="rounded-xl bg-red-50 px-3 py-2 font-black text-red-700">🗑</button></div></td>
@@ -389,8 +402,8 @@ export default function PosProductsPage() {
               </div>
               <div className="p-4">
                 <p className="font-black">{product.name}</p><p className="text-xs font-bold text-slate-500">{product.sku} · {product.category}</p>
-                <p className="mt-3 text-lg font-black">{formatKHR(product.price)}</p>
-                <p className="text-sm font-bold text-slate-500">{formatUSD(toUSD(product.price, settings.currency.exchangeRate))}</p>
+                <p className="mt-3 text-lg font-black">{formatPrimaryMoney(product.price, settings, false)}</p>
+                <p className="text-sm font-bold text-slate-500">{formatSecondaryPrice(product.price)}</p>
                 <div className="mt-3">{stockLabel(product)}</div>
               </div>
             </article>

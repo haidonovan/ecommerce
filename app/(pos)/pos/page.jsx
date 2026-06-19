@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import { formatPrimaryMoney } from "@/components/pos/format";
 import { getAll, put } from "@/lib/db";
 import { useOffline } from "@/hooks/useOffline";
+import { usePOSSettings } from "@/hooks/usePOSSettings";
 import { usePosStore } from "@/store/posStore";
 
 const todayKey = new Date().toISOString().slice(0, 10);
@@ -13,10 +15,6 @@ const fallbackStats = {
   itemsSold: 0,
   pendingSync: 0,
 };
-
-function formatKHR(value) {
-  return `${Number(value || 0).toLocaleString()} KHR`;
-}
 
 function calculateStatsFromTransactions(transactions) {
   const todaysTransactions = transactions.filter(
@@ -36,6 +34,7 @@ function calculateStatsFromTransactions(transactions) {
 
 export default function PosDashboardPage() {
   const { isOnline, isOffline } = useOffline();
+  const { settings } = usePOSSettings();
   const pendingSyncCount = usePosStore((state) => state.pendingSyncCount);
   const setPendingSyncCount = usePosStore((state) => state.setPendingSyncCount);
   const [stats, setStats] = useState(fallbackStats);
@@ -91,7 +90,7 @@ export default function PosDashboardPage() {
   }, [isOnline, setPendingSyncCount]);
 
   const cards = [
-    { label: "Today's Revenue", value: formatKHR(stats.revenue) },
+    { label: "Today's Revenue", value: formatPrimaryMoney(stats.revenue, settings, false) },
     { label: "Transactions", value: Number(stats.transactions || 0).toLocaleString() },
     { label: "Items Sold", value: Number(stats.itemsSold || 0).toLocaleString() },
     { label: "Pending Sync", value: Number(pendingSyncCount || stats.pendingSync || 0).toLocaleString() },

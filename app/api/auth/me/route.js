@@ -1,4 +1,4 @@
-import { fail, handleRouteError, ok } from "@/lib/api-response";
+import { fail, handleRouteError, isDatabaseUnavailableError, ok } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -10,19 +10,33 @@ export async function GET() {
       return fail("Not authenticated.", 401);
     }
 
-    const user = await prisma.user.findUnique({
-      where: {
+    let user = null;
+
+    try {
+      user = await prisma.user.findUnique({
+        where: {
+          id: session.id,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      });
+    } catch (error) {
+      if (!isDatabaseUnavailableError(error) || !String(session.id || "").startsWith("env-")) {
+        throw error;
+      }
+
+      user = {
         id: session.id,
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-      },
-    });
+        email: session.email,
+        role: session.role,
+      };
+    }
 
     if (!user) {
-      return fail("Session user not found.", 404);
+      return fail("Not authenticated.", 401);
     }
 
     return ok({

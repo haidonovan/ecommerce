@@ -222,7 +222,7 @@ function ProductCard({ product, store }) {
       <div className="flex flex-1 flex-col gap-2.5 px-3.5 pb-3.5 pt-3">
         <Link
           href={`/client/product-detail/${product.id}`}
-          className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.98rem] font-semibold leading-5 text-[var(--public-home-product-foreground)]"
+          className="public-home-product-title overflow-hidden text-ellipsis whitespace-nowrap text-[0.98rem] font-semibold leading-5"
           title={product.name}
         >
           {product.name}

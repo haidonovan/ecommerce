@@ -192,7 +192,7 @@ export function PosShell() {
             <Link href="/client" className="app-link-button">
               Storefront
             </Link>
-            <Link href="/admin/login" className="app-link-button">
+            <Link href="/login" className="app-link-button">
               Admin
             </Link>
           </div>

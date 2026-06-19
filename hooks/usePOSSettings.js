@@ -8,7 +8,7 @@ const STORAGE_KEY = "pos-settings";
 
 export const defaultPOSSettings = {
   currency: {
-    primaryCurrency: "KHR",
+    primaryCurrency: "USD",
     showBothCurrencies: true,
     exchangeRate: 4100,
     lastUpdated: "",

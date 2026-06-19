@@ -1,5 +1,6 @@
 import { fail, handleRouteError, ok } from "@/lib/api-response";
-import { getCurrentUser } from "@/lib/auth";
+import { createAuditLog, createInventoryMovement } from "@/lib/business-events";
+import { canAccessPOS, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeOrder } from "@/lib/serializers";
 
@@ -16,7 +17,7 @@ function mapCouponType(type) {
   return type === "percent" ? "PERCENT" : "FIXED";
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
     const user = await getCurrentUser();
 
@@ -24,8 +25,27 @@ export async function GET() {
       return fail("Not authenticated.", 401);
     }
 
+    const { searchParams } = new URL(request.url);
+    const channel = searchParams.get("channel")?.toUpperCase();
+    const status = searchParams.get("status")?.toUpperCase();
+    const where = {};
+
+    if (user.role === "ADMIN") {
+      if (channel === "ONLINE" || channel === "POS") {
+        where.channel = channel;
+      }
+    } else if (canAccessPOS(user.role)) {
+      where.channel = "ONLINE";
+    } else {
+      where.userId = user.id;
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
     const orders = await prisma.order.findMany({
-      where: user.role === "ADMIN" ? {} : { userId: user.id },
+      where,
       include: {
         lines: true,
       },
@@ -131,6 +151,7 @@ export async function POST(request) {
       const created = await tx.order.create({
         data: {
           userId: user.id,
+          channel: "ONLINE",
           shippingAddress,
           paymentMethod,
           subtotal,
@@ -156,9 +177,12 @@ export async function POST(request) {
       });
 
       for (const line of normalizedLines) {
-        await tx.product.update({
+        const stockUpdate = await tx.product.updateMany({
           where: {
             id: line.product.id,
+            stock: {
+              gte: line.quantity,
+            },
           },
           data: {
             stock: {
@@ -166,7 +190,45 @@ export async function POST(request) {
             },
           },
         });
+
+        if (stockUpdate.count !== 1) {
+          throw new Error("INSUFFICIENT_STOCK");
+        }
+
+        const updatedProduct = await tx.product.findUnique({
+          where: {
+            id: line.product.id,
+          },
+          select: {
+            stock: true,
+          },
+        });
+
+        await createInventoryMovement(tx, {
+          productId: line.product.id,
+          orderId: created.id,
+          type: "RESERVATION",
+          channel: "ONLINE",
+          quantity: line.quantity,
+          previousStock: Number(updatedProduct.stock) + line.quantity,
+          nextStock: Number(updatedProduct.stock),
+          note: "Online order inventory reservation",
+          userId: user.id,
+        });
       }
+
+      await createAuditLog(tx, {
+        userId: user.id,
+        action: "CREATE",
+        module: "orders",
+        recordId: created.id,
+        newValue: {
+          channel: "ONLINE",
+          status: created.status,
+          total: Number(created.total),
+          itemCount: normalizedLines.reduce((sum, line) => sum + line.quantity, 0),
+        },
+      });
 
       return created;
     });
@@ -175,6 +237,10 @@ export async function POST(request) {
       data: serializeOrder(order),
     });
   } catch (error) {
+    if (error?.message === "INSUFFICIENT_STOCK") {
+      return fail("One or more products no longer have enough stock.", 409);
+    }
+
     return handleRouteError(error, "Unable to create order.");
   }
 }

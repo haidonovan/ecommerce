@@ -197,8 +197,8 @@ export default function PosSettingsPage() {
                   name="currency"
                   value={draft.currency.primaryCurrency}
                   options={[
-                    { value: "KHR", label: "KHR" },
                     { value: "USD", label: "USD" },
+                    { value: "KHR", label: "KHR" },
                   ]}
                   onChange={(value) => patchSection("currency", { primaryCurrency: value })}
                 />

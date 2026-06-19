@@ -541,7 +541,12 @@ img {
 
 .public-home-product-card {
   background: color-mix(in srgb, #08111a 82%, var(--action));
-  --public-home-product-foreground: color-mix(in srgb, white 92%, var(--surface));
+  --public-home-product-foreground: color-mix(in srgb, var(--action-foreground) 94%, white);
+}
+
+.public-home-product-title {
+  color: var(--public-home-product-foreground);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.28);
 }
 
 .public-home-product-muted {

@@ -1,8 +1,10 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useMemo, useState } from "react";
 
-import { formatUSD, toUSD } from "@/components/pos/format";
+import { convertMoney, formatMoney } from "@/components/pos/format";
 
 const emptyProduct = {
   id: "",
@@ -29,8 +31,8 @@ function generateSku() {
 export function ProductFormModal({ open, mode = "add", product, categories = [], exchangeRate = 4100, onClose, onSave }) {
   const [form, setForm] = useState(emptyProduct);
   const [newCategory, setNewCategory] = useState("");
-  const [overrideUsd, setOverrideUsd] = useState(false);
-  const [priceUsd, setPriceUsd] = useState("");
+  const [overrideSecondary, setOverrideSecondary] = useState(false);
+  const [priceSecondary, setPriceSecondary] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -53,8 +55,8 @@ export function ProductFormModal({ open, mode = "add", product, categories = [],
 
     setForm(nextForm);
     setNewCategory("");
-    setOverrideUsd(false);
-    setPriceUsd("");
+    setOverrideSecondary(false);
+    setPriceSecondary("");
     setError("");
   }, [open, product]);
 
@@ -62,7 +64,13 @@ export function ProductFormModal({ open, mode = "add", product, categories = [],
     return [...new Set(["Beverages", "Snacks", "Grocery", "Noodles", "Sauce", ...categories])];
   }, [categories]);
 
-  const calculatedUsd = formatUSD(toUSD(form.price, exchangeRate));
+  const secondaryCurrency = "KHR";
+  const calculatedSecondary = formatMoney(
+    convertMoney(form.price, "USD", secondaryCurrency, exchangeRate),
+    secondaryCurrency,
+    exchangeRate,
+    false,
+  );
 
   function patch(values) {
     setForm((current) => ({ ...current, ...values }));
@@ -87,7 +95,7 @@ export function ProductFormModal({ open, mode = "add", product, categories = [],
     }
 
     if (!Number(form.price)) {
-      setError("Price in KHR is required.");
+      setError("Price in USD is required.");
       return;
     }
 
@@ -105,7 +113,9 @@ export function ProductFormModal({ open, mode = "add", product, categories = [],
       ...form,
       category: finalCategory,
       sku: form.sku || generateSku(),
-      price: overrideUsd && priceUsd ? Math.round(Number(priceUsd) * exchangeRate) : Number(form.price),
+      price: overrideSecondary && priceSecondary
+        ? convertMoney(Number(priceSecondary), secondaryCurrency, "USD", exchangeRate)
+        : Number(form.price),
       stock: Number(form.stock || 0),
       lowStockThreshold: Number(form.lowStockThreshold || 0),
       updatedAt: new Date().toISOString(),
@@ -190,18 +200,18 @@ export function ProductFormModal({ open, mode = "add", product, categories = [],
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="text-sm font-bold text-slate-700">Price in KHR*</label>
+                <label className="text-sm font-bold text-slate-700">Price in USD*</label>
                 <input type="number" value={form.price} onChange={(event) => patch({ price: Number(event.target.value) })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-bold outline-none focus:border-emerald-500" />
               </div>
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-slate-700">Price in USD</label>
+                  <label className="text-sm font-bold text-slate-700">Price in {secondaryCurrency}</label>
                   <label className="flex items-center gap-2 text-xs font-black text-slate-600">
-                    <input type="checkbox" checked={overrideUsd} onChange={(event) => setOverrideUsd(event.target.checked)} className="accent-emerald-600" />
+                    <input type="checkbox" checked={overrideSecondary} onChange={(event) => setOverrideSecondary(event.target.checked)} className="accent-emerald-600" />
                     Override
                   </label>
                 </div>
-                <input value={overrideUsd ? priceUsd : calculatedUsd} onChange={(event) => setPriceUsd(event.target.value)} readOnly={!overrideUsd} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-bold outline-none focus:border-emerald-500 read-only:bg-slate-50" />
+                <input value={overrideSecondary ? priceSecondary : calculatedSecondary} onChange={(event) => setPriceSecondary(event.target.value)} readOnly={!overrideSecondary} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-bold outline-none focus:border-emerald-500 read-only:bg-slate-50" />
               </div>
             </div>
 

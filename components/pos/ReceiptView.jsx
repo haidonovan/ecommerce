@@ -1,11 +1,13 @@
 "use client";
 
-import { formatKHR } from "@/components/pos/format";
+import { formatDisplayMoney } from "@/components/pos/format";
 
 export function ReceiptView({ transaction, settings, onNewSale }) {
   if (!transaction) {
     return null;
   }
+
+  const money = (value) => formatDisplayMoney(value, transaction.currency, settings);
 
   return (
     <div className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -36,21 +38,21 @@ export function ReceiptView({ transaction, settings, onNewSale }) {
             <div key={item.productId} className="text-sm">
               <div className="flex justify-between gap-4 font-bold">
                 <span>{item.name}</span>
-                <span>{formatKHR(item.price * item.qty)}</span>
+                <span>{money(item.price * item.qty)}</span>
               </div>
-              <p className="text-slate-500">{item.qty} × {formatKHR(item.price)}</p>
+              <p className="text-slate-500">{item.qty} x {money(item.price)}</p>
               {item.note ? <p className="text-slate-500">Note: {item.note}</p> : null}
             </div>
           ))}
         </div>
 
         <div className="mt-5 space-y-2 border-t border-slate-200 pt-4 text-sm font-bold">
-          <div className="flex justify-between"><span>Subtotal</span><span>{formatKHR(transaction.subtotal)}</span></div>
-          <div className="flex justify-between text-emerald-700"><span>Discount</span><span>-{formatKHR(transaction.discount)}</span></div>
-          <div className="flex justify-between"><span>{settings.tax.taxName}</span><span>{formatKHR(transaction.tax)}</span></div>
-          <div className="flex justify-between text-xl font-black"><span>Total</span><span>{formatKHR(transaction.total)}</span></div>
-          <div className="flex justify-between"><span>Cash Received</span><span>{formatKHR(transaction.cashReceived)}</span></div>
-          <div className="flex justify-between"><span>Change Due</span><span>{formatKHR(transaction.changeDue)}</span></div>
+          <div className="flex justify-between"><span>Subtotal</span><span>{money(transaction.subtotal)}</span></div>
+          <div className="flex justify-between text-emerald-700"><span>Discount</span><span>-{money(transaction.discount)}</span></div>
+          <div className="flex justify-between"><span>{settings.tax.taxName}</span><span>{money(transaction.tax)}</span></div>
+          <div className="flex justify-between text-xl font-black"><span>Total</span><span>{money(transaction.total)}</span></div>
+          <div className="flex justify-between"><span>Cash Received</span><span>{money(transaction.cashReceived)}</span></div>
+          <div className="flex justify-between"><span>Change Due</span><span>{money(transaction.changeDue)}</span></div>
         </div>
 
         <p className="mt-6 text-center text-sm font-semibold text-slate-600">{settings.storeInfo.receiptFooterMessage}</p>
