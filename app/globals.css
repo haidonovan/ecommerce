@@ -60,126 +60,17 @@ body::after {
   background: var(--accent-secondary);
 }
 
-body.theme-classic {
-  --background-start: #f7f2ec;
-  --background-end: #e7f3f1;
-  --action: #127c73;
-  --action-foreground: #f7fffd;
-  --accent: #b7d6d0;
-  --accent-secondary: #f0d9c6;
-  --surface: #ffffff;
-  --surface-strong: rgba(255, 255, 255, 0.94);
-  --surface-soft: #fffdfa;
-  --surface-quiet: #eef7f5;
-  --surface-tint: rgba(183, 214, 208, 0.52);
-  --border-soft: rgba(183, 214, 208, 0.44);
-  --outline-strong: rgba(18, 124, 115, 0.28);
-  --input-fill: #ffffff;
-}
+/* legacy theme-classic removed — use app/design-tokens.css for theme tokens */
 
-body.theme-classic[data-mode="dark"] {
-  --background-start: #0b0f14;
-  --background-end: #121d27;
-  --foreground: #eef5f8;
-  --surface: #121d27;
-  --surface-strong: rgba(18, 29, 39, 0.94);
-  --surface-soft: #16212b;
-  --surface-quiet: #183445;
-  --muted-foreground: #b3c0c8;
-  --action: #5fb4aa;
-  --action-foreground: #071115;
-  --accent: #2a4154;
-  --accent-secondary: #3a2b4a;
-  --surface-tint: rgba(42, 65, 84, 0.72);
-  --border-soft: rgba(42, 65, 84, 0.5);
-  --outline-strong: rgba(95, 180, 170, 0.48);
-  --input-fill: #16212b;
-  --shadow-soft: 0 6px 16px rgba(0, 0, 0, 0.16);
-  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.22);
-  --shadow-strong: 0 22px 50px rgba(0, 0, 0, 0.28);
-}
+/* legacy theme-classic dark variant removed — use app/design-tokens.css for theme tokens */
 
-body.theme-golden {
-  --background-start: #fbf4df;
-  --background-end: #f2e2b7;
-  --foreground: #251b10;
-  --surface: #fff8ea;
-  --surface-strong: rgba(255, 248, 234, 0.94);
-  --surface-soft: #fff7e5;
-  --surface-quiet: #fdf1d2;
-  --muted-foreground: #6d5b43;
-  --action: #b8860b;
-  --action-foreground: #fff9eb;
-  --accent: #e2c16c;
-  --accent-secondary: #f4d7a1;
-  --surface-tint: rgba(226, 193, 108, 0.56);
-  --border-soft: rgba(226, 193, 108, 0.4);
-  --outline-strong: rgba(184, 134, 11, 0.28);
-  --input-fill: #fff4dd;
-}
+/* legacy theme-golden removed — use app/design-tokens.css for theme tokens */
 
-body.theme-golden[data-mode="dark"] {
-  --background-start: #17120a;
-  --background-end: #241a0e;
-  --foreground: #f6ecdb;
-  --surface: #21170d;
-  --surface-strong: rgba(33, 23, 13, 0.94);
-  --surface-soft: #261a0e;
-  --surface-quiet: #5b4311;
-  --muted-foreground: #d2bea0;
-  --action: #d3a63a;
-  --action-foreground: #1b140a;
-  --accent: #8a6721;
-  --accent-secondary: #5d3d13;
-  --surface-tint: rgba(138, 103, 33, 0.7);
-  --border-soft: rgba(138, 103, 33, 0.45);
-  --outline-strong: rgba(211, 166, 58, 0.4);
-  --input-fill: #261a0e;
-  --shadow-soft: 0 6px 16px rgba(0, 0, 0, 0.16);
-  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.22);
-  --shadow-strong: 0 22px 50px rgba(0, 0, 0, 0.28);
-}
+/* legacy theme-golden dark variant removed — use app/design-tokens.css for theme tokens */
 
-body.theme-pink {
-  --background-start: #fff0f6;
-  --background-end: #f9d9e7;
-  --foreground: #2b1723;
-  --surface: #fff7fb;
-  --surface-strong: rgba(255, 247, 251, 0.94);
-  --surface-soft: #fff4fa;
-  --surface-quiet: #ffe6f1;
-  --muted-foreground: #735968;
-  --action: #d85a9a;
-  --action-foreground: #fff8fb;
-  --accent: #f1a6c7;
-  --accent-secondary: #f7c6db;
-  --surface-tint: rgba(241, 166, 199, 0.54);
-  --border-soft: rgba(241, 166, 199, 0.42);
-  --outline-strong: rgba(216, 90, 154, 0.28);
-  --input-fill: #fff1f7;
-}
+/* legacy theme-pink removed — use app/design-tokens.css for theme tokens */
 
-body.theme-pink[data-mode="dark"] {
-  --background-start: #170c13;
-  --background-end: #24101c;
-  --foreground: #f8ecf2;
-  --surface: #21121a;
-  --surface-strong: rgba(33, 18, 26, 0.94);
-  --surface-soft: #26151f;
-  --surface-quiet: #4a2137;
-  --muted-foreground: #d4bac7;
-  --action: #e170a8;
-  --action-foreground: #1a0b13;
-  --accent: #6a2e51;
-  --accent-secondary: #3c1832;
-  --surface-tint: rgba(106, 46, 81, 0.72);
-  --border-soft: rgba(106, 46, 81, 0.46);
-  --outline-strong: rgba(225, 112, 168, 0.4);
-  --input-fill: #26151f;
-  --shadow-soft: 0 6px 16px rgba(0, 0, 0, 0.16);
-  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.22);
-  --shadow-strong: 0 22px 50px rgba(0, 0, 0, 0.28);
-}
+/* legacy theme-pink dark variant removed — use app/design-tokens.css for theme tokens */
 
 a {
   color: inherit;
@@ -267,18 +158,20 @@ img {
 .app-input,
 .app-select {
   width: 100%;
-  border: 1px solid var(--border-soft);
-  border-radius: 0.75rem;
-  background: var(--input-fill);
-  color: var(--foreground);
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--outline) 24%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--on-surface);
+  padding: 0.5rem 0;
   outline: none;
   transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
 .app-input:focus,
 .app-select:focus {
-  border-color: var(--outline-strong);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--action) 12%, transparent);
+  border-bottom-color: var(--charcoal-ink);
+  box-shadow: none;
 }
 
 .app-search-shell {
@@ -292,16 +185,22 @@ img {
 }
 
 .app-chip {
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
-  background: var(--input-fill);
-  color: var(--foreground);
+  border-radius: 0;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container);
+  color: var(--on-surface-variant);
+  padding: 0.25rem 0.5rem;
+  font-size: var(--label-caps-font-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
   transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
 .app-chip[data-active="true"] {
-  background: color-mix(in srgb, var(--action) 14%, var(--surface));
-  border-color: color-mix(in srgb, var(--action) 28%, var(--border-soft));
+  background: var(--secondary-container);
+  border-color: color-mix(in srgb, var(--secondary) 24%, transparent);
+  color: var(--on-secondary-container);
 }
 
 .app-link-button {
@@ -325,25 +224,24 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0;
+  border: 1px solid var(--outline-variant);
   background: var(--surface);
-  color: var(--foreground);
-  box-shadow: var(--shadow-soft);
+  color: var(--on-surface);
+  box-shadow: none;
   transform: translateZ(0);
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
+  transition: background-color 180ms ease, border-color 180ms ease, transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-top-label {
-  font-size: 0.75rem;
+  font-size: var(--label-caps-font-size);
+  font-family: var(--font-sans);
   font-weight: 600;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: var(--on-surface-variant);
 }
 
 .app-nav-surface {
@@ -354,15 +252,19 @@ img {
 }
 
 .app-nav-button {
-  border-radius: 0.875rem;
-  color: var(--muted-foreground);
+  border-radius: 0;
+  color: var(--on-surface-variant);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
   transform: translateZ(0);
   transition: background-color 180ms ease, color 180ms ease, transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-nav-button[data-active="true"] {
-  background: color-mix(in srgb, var(--action) 14%, var(--surface));
-  color: var(--foreground);
+  background: var(--surface-container);
+  color: var(--on-surface);
+  border-bottom: 2px solid var(--primary);
 }
 
 .app-theme-trigger {
@@ -372,17 +274,13 @@ img {
   justify-content: center;
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
+  border-radius: 0;
+  border: 1px solid var(--outline-variant);
   background: var(--surface);
-  color: var(--foreground);
-  box-shadow: var(--shadow-soft);
+  color: var(--on-surface);
+  box-shadow: none;
   transform: translateZ(0);
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
+  transition: background-color 180ms ease, border-color 180ms ease, transform 140ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
 .app-theme-trigger-badge {
