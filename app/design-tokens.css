@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Libre+Caslon+Text:ital,wght@0,400;1,400&display=swap');
+
+:root {
+  /* Palette (Ethos of Stillness) */
+  --surface: #fdf9f1;
+  --surface-dim: #dddad2;
+  --surface-bright: #fdf9f1;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f7f3eb;
+  --surface-container: #f2ede5;
+  --surface-container-high: #ece8e0;
+  --surface-container-highest: #e6e2da;
+  --on-surface: #1c1c17;
+  --on-surface-variant: #444748;
+  --inverse-surface: #31302b;
+  --inverse-on-surface: #f4f0e8;
+  --outline: #747878;
+  --outline-variant: #c4c7c7;
+  --surface-tint: #5f5e5e;
+  --primary: #000000;
+  --on-primary: #ffffff;
+  --primary-container: #1c1b1b;
+  --on-primary-container: #858383;
+  --inverse-primary: #c8c6c5;
+  --secondary: #695d4a;
+  --on-secondary: #ffffff;
+  --secondary-container: #f2e0c8;
+  --on-secondary-container: #6f6350;
+  --tertiary: #000000;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #1c1c18;
+  --on-tertiary-container: #85847e;
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+  --primary-fixed: #e5e2e1;
+  --primary-fixed-dim: #c8c6c5;
+  --on-primary-fixed: #1c1b1b;
+  --on-primary-fixed-variant: #474746;
+  --secondary-fixed: #f2e0c8;
+  --secondary-fixed-dim: #d5c4ad;
+  --on-secondary-fixed: #231a0c;
+  --on-secondary-fixed-variant: #504534;
+  --tertiary-fixed: #e5e2db;
+  --tertiary-fixed-dim: #c9c6c0;
+  --on-tertiary-fixed: #1c1c18;
+  --on-tertiary-fixed-variant: #474742;
+  --background: #fdf9f1;
+  --on-background: #1c1c17;
+  --surface-variant: #e6e2da;
+  --surface-cream: #F4F1EA;
+  --surface-bone: #EBE7DF;
+  --charcoal-ink: #1A1A1A;
+  --taupe-mute: #8C7E6A;
+
+  /* Legacy mappings (keep compatibility with existing CSS) */
+  --background-start: var(--surface-cream);
+  --background-end: var(--surface-container);
+  --foreground: var(--on-surface);
+  --surface-strong: var(--surface-container);
+  --surface-soft: var(--surface-bone);
+  --surface-quiet: var(--surface-container-low);
+  --muted-foreground: var(--on-surface-variant);
+  --action: var(--primary);
+  --action-foreground: var(--on-primary);
+  --accent: var(--secondary);
+  --accent-secondary: var(--secondary-container);
+  --border-soft: var(--outline);
+  --input-fill: var(--surface);
+  --shadow-soft: 0 6px 16px rgba(0,0,0,0.04);
+  --shadow-card: 0 16px 38px rgba(0,0,0,0.06);
+  --shadow-strong: 0 20px 44px rgba(0,0,0,0.1);
+
+  /* Typography tokens */
+  --font-display: "Libre Caslon Text", serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --display-lg-font-size: 80px;
+  --display-lg-mobile-font-size: 48px;
+  --headline-lg-font-size: 40px;
+  --headline-sm-font-size: 20px;
+  --body-lg-font-size: 18px;
+  --body-md-font-size: 16px;
+  --label-caps-font-size: 12px;
+
+  /* Spacing */
+  --unit: 8px;
+  --gutter: 24px;
+  --margin-desktop: 80px;
+  --margin-mobile: 20px;
+  --section-gap: 120px;
+  --stack-sm: 8px;
+  --stack-md: 16px;
+  --stack-lg: 32px;
+}
