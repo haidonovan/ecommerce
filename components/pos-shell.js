@@ -5,8 +5,12 @@ import Link from "next/link";
 import { Banknote, Minus, Plus, Search, ShoppingBag, Trash2, Wifi, WifiOff } from "lucide-react";
 
 import { useAppStore } from "@/components/app-store-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { listQueuedPosSales, queuePosSale } from "@/lib/offline-db";
 import { cn, formatCurrency } from "@/lib/utils";
+import { usePOSSettings } from "@/hooks/usePOSSettings";
+import { useTranslation } from "@/lib/translations";
+import { LogoutButton } from "@/components/logout-button";
 
 function discountedPrice(product) {
   return Number((product.price * (1 - (product.discountPercent || 0) / 100)).toFixed(2));
@@ -18,6 +22,10 @@ function createSaleId() {
 
 export function PosShell() {
   const store = useAppStore();
+  const { settings } = usePOSSettings();
+  const lang = settings?.appearance?.defaultLanguage || "en";
+  const { t } = useTranslation(lang);
+
   const [cart, setCart] = useState([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
@@ -174,9 +182,13 @@ export function PosShell() {
       <header className="app-bar px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="app-top-label">POS</p>
-            <h1 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Cashier checkout</h1>
+            <p className="app-top-label">{t("pos")}</p>
+            <h1 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">{t("cashier_checkout")}</h1>
           </div>
+          <div className="flex items-center gap-2">
+                      <ThemeToggle />
+                      <LogoutButton className="hidden min-[700px]:inline-flex" iconOnly />
+                    </div>
           <div className="flex items-center gap-2">
             <span
               className={cn(
@@ -187,13 +199,13 @@ export function PosShell() {
               )}
             >
               {onlineStatusReady && !online ? <WifiOff className="size-3.5" /> : <Wifi className="size-3.5" />}
-              {onlineStatusReady ? (online ? "Online" : "Offline") : "Checking"}
+              {onlineStatusReady ? (online ? t("online") : t("offline")) : t("checking")}
             </span>
             <Link href="/client" className="app-link-button">
-              Storefront
+              {t("storefront")}
             </Link>
             <Link href="/login" className="app-link-button">
-              Admin
+              {t("admin")}
             </Link>
           </div>
         </div>
@@ -208,13 +220,13 @@ export function PosShell() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search products"
+                  placeholder={t("search_products")}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--muted-foreground)]"
                 />
               </label>
               <select value={category} onChange={(event) => setCategory(event.target.value)} className="app-select px-4 py-3 text-sm">
                 {categories.map((entry) => (
-                  <option key={entry}>{entry}</option>
+                  <option key={entry}>{entry === "All" ? t("all_categories") : entry}</option>
                 ))}
               </select>
             </div>
@@ -239,7 +251,7 @@ export function PosShell() {
                     <h2 className="mt-1 line-clamp-2 text-sm font-semibold text-[var(--foreground)]">{product.name}</h2>
                     <div className="mt-auto flex items-end justify-between gap-3 pt-3">
                       <span className="text-base font-bold text-[var(--foreground)]">{formatCurrency(discountedPrice(product))}</span>
-                      <span className="text-xs text-[var(--muted-foreground)]">{product.stock} left</span>
+                      <span className="text-xs text-[var(--muted-foreground)]">{product.stock} {t("left")}</span>
                     </div>
                   </div>
                 </div>
@@ -251,8 +263,8 @@ export function PosShell() {
         <aside className="app-card h-fit p-4 xl:sticky xl:top-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="app-top-label">Current Sale</p>
-              <h2 className="mt-1 text-xl font-semibold text-[var(--foreground)]">{cartLines.length} line items</h2>
+              <p className="app-top-label">{t("current_sale")}</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--foreground)]">{cartLines.length} {t("items")}</h2>
             </div>
             <div className="rounded-full bg-[color-mix(in_srgb,var(--action)_14%,var(--surface))] p-3 text-[var(--action)]">
               <ShoppingBag className="size-5" />
@@ -266,24 +278,24 @@ export function PosShell() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-[var(--foreground)]">{line.product.name}</p>
-                      <p className="mt-1 text-xs text-[var(--muted-foreground)]">{formatCurrency(line.unitPrice)} each</p>
+                      <p className="mt-1 text-xs text-[var(--muted-foreground)]">{formatCurrency(line.unitPrice)} {t("each")}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => updateQuantity(line.productId, 0)}
                       className="app-icon-button size-8"
-                      aria-label={`Remove ${line.product.name}`}
+                      aria-label={`${t("remove")} ${line.product.name}`}
                     >
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => updateQuantity(line.productId, line.quantity - 1)} className="app-icon-button size-8" aria-label="Decrease quantity">
+                      <button type="button" onClick={() => updateQuantity(line.productId, line.quantity - 1)} className="app-icon-button size-8" aria-label={t("decrease")}>
                         <Minus className="size-3.5" />
                       </button>
                       <span className="w-8 text-center text-sm font-semibold">{line.quantity}</span>
-                      <button type="button" onClick={() => updateQuantity(line.productId, line.quantity + 1)} className="app-icon-button size-8" aria-label="Increase quantity">
+                      <button type="button" onClick={() => updateQuantity(line.productId, line.quantity + 1)} className="app-icon-button size-8" aria-label={t("increase")}>
                         <Plus className="size-3.5" />
                       </button>
                     </div>
@@ -293,22 +305,22 @@ export function PosShell() {
               ))
             ) : (
               <div className="rounded-xl border border-dashed border-[var(--border-soft)] px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
-                Select products to start an in-store sale.
+                {t("select_products_pos")}
               </div>
             )}
           </div>
 
           <div className="mt-5 space-y-2 border-t border-[var(--border-soft)] pt-4 text-sm">
             <div className="flex justify-between">
-              <span className="text-[var(--muted-foreground)]">Subtotal</span>
+              <span className="text-[var(--muted-foreground)]">{t("subtotal")}</span>
               <span className="font-semibold">{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--muted-foreground)]">Tax</span>
+              <span className="text-[var(--muted-foreground)]">{t("tax")}</span>
               <span className="font-semibold">{formatCurrency(tax)}</span>
             </div>
             <div className="flex justify-between text-lg">
-              <span className="font-semibold">Total</span>
+              <span className="font-semibold">{t("total")}</span>
               <span className="font-bold">{formatCurrency(total)}</span>
             </div>
           </div>
@@ -325,14 +337,14 @@ export function PosShell() {
                 )}
               >
                 <Banknote className="size-4" />
-                {method}
+                {t(method)}
               </button>
             ))}
           </div>
 
           {paymentMethod === "cash" ? (
             <div className="mt-4">
-              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">Cash received</label>
+              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">{t("cash_received")}</label>
               <input
                 type="number"
                 min="0"
@@ -341,7 +353,7 @@ export function PosShell() {
                 onChange={(event) => setCashReceived(event.target.value)}
                 className="app-input px-4 py-3"
               />
-              <p className="mt-2 text-sm text-[var(--muted-foreground)]">Change: {formatCurrency(changeDue)}</p>
+              <p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("change")}: {formatCurrency(changeDue)}</p>
             </div>
           ) : null}
 
@@ -352,11 +364,11 @@ export function PosShell() {
             onClick={completeSale}
             className="mt-5 w-full rounded-xl bg-[var(--action)] px-4 py-3 text-sm font-semibold text-[var(--action-foreground)]"
           >
-            Complete sale
+            {t("complete_sale")}
           </button>
 
           <p className="mt-3 text-center text-xs text-[var(--muted-foreground)]">
-            {queuedCount} offline sale{queuedCount === 1 ? "" : "s"} queued
+            {queuedCount} {t("sales_queued")}
           </p>
         </aside>
       </section>

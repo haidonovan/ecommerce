@@ -9,6 +9,7 @@ import {
   ChartColumn,
   CircleDollarSign,
   ClipboardCheck,
+  Download,
   PackageSearch,
   ReceiptText,
   ShieldAlert,
@@ -990,6 +991,66 @@ export function AdminOrderManagementPageView() {
   );
 }
 
+function ExportMenu() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const exportOptions = [
+    { label: "Sales Report", type: "sales" },
+    { label: "Inventory Valuation", type: "inventory" },
+    { label: "Receivables / Credits", type: "credits" },
+    { label: "Container Ledger", type: "containers" },
+    { label: "Procurement Report", type: "procurement" },
+  ];
+
+  function handleExport(type) {
+    const url = `/api/reports/admin/export?type=${type}`;
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${type}_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="relative">
+      <Button
+        variant="secondary"
+        onClick={() => setIsOpen(!isOpen)}
+        className="gap-2 border border-[var(--border-soft)]"
+      >
+        <Download className="size-4" />
+        Export CSV
+      </Button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] shadow-[var(--shadow-strong)]">
+            <p className="border-b border-[var(--border-soft)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              Download Report
+            </p>
+            {exportOptions.map((option) => (
+              <button
+                key={option.type}
+                type="button"
+                onClick={() => handleExport(option.type)}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[var(--foreground)] transition hover:bg-[var(--surface-quiet)]"
+              >
+                <Download className="size-3.5 shrink-0 text-[var(--action)]" />
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AdminSalesReportPageView() {
   const store = useAppStore();
   const [range, setRange] = useState("month");
@@ -1046,7 +1107,7 @@ export function AdminSalesReportPageView() {
       <Card>
         <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Sales Report</p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-[var(--foreground)]">Admin reports for POS and online performance.</h1>
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-6 flex flex-wrap items-center gap-2">
           {dashboardRangeOptions
             .filter((option) => option.key !== "custom")
             .map((option) => (
@@ -1060,6 +1121,7 @@ export function AdminSalesReportPageView() {
             </button>
           ))}
           <Button variant="secondary" onClick={loadReport}>Refresh</Button>
+          <ExportMenu />
         </div>
         {reportMessage ? <p className="mt-4 text-sm text-red-600">{reportMessage}</p> : null}
       </Card>

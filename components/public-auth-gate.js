@@ -204,10 +204,10 @@ function PublicHeroCarousel({ products, onRequireLogin, reverse = false }) {
   const pointerActiveRef = useRef(false);
   const currentVelocityRef = useRef(0);
   const targetVelocityRef = useRef(0);
+  const isVisibleRef = useRef(false);
   const shouldAutoScroll = products.length > 1;
   const visibleProducts = products.slice(0, 5);
   const productIdsKey = visibleProducts.map((product) => product.id).join("|");
-  const productKey = visibleProducts.map((product) => product.id).join("|");
 
   useEffect(() => {
     const scrollNode = scrollRef.current;
@@ -234,7 +234,8 @@ function PublicHeroCarousel({ products, onRequireLogin, reverse = false }) {
     scrollNode.scrollLeft = cycleWidth * BASE_CYCLE_INDEX;
 
     const step = (now) => {
-      if (!scrollNode) {
+      if (!scrollNode || !isVisibleRef.current) {
+        animationRef.current = null;
         return;
       }
 
@@ -276,9 +277,25 @@ function PublicHeroCarousel({ products, onRequireLogin, reverse = false }) {
       animationRef.current = window.requestAnimationFrame(step);
     };
 
-    animationRef.current = window.requestAnimationFrame(step);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+
+        if (entry.isIntersecting && !animationRef.current) {
+          lastTimeRef.current = 0;
+          animationRef.current = window.requestAnimationFrame(step);
+        } else if (!entry.isIntersecting && animationRef.current) {
+          window.cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+          lastTimeRef.current = 0;
+        }
+      },
+      { rootMargin: "64px" },
+    );
+    observer.observe(scrollNode);
 
     return () => {
+      observer.disconnect();
       if (animationRef.current) {
         window.cancelAnimationFrame(animationRef.current);
       }
@@ -559,6 +576,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
   const [notice, setNotice] = useState("");
   const [visibleGridCounts, setVisibleGridCounts] = useState({});
   const [revealState, setRevealState] = useState(null);
+  const authViewParam = searchParams.get("auth") || "";
 
   const categories = useMemo(() => [...new Set(store.activeProducts.map((product) => product.category))], [store.activeProducts]);
   const categoryChips = useMemo(() => ["All", ...categories], [categories]);
@@ -655,17 +673,17 @@ export function PublicAuthGate({ initialAuthView = "" }) {
     [priceFilter, query, quickFilters, selectedCategories],
   );
 
-  useEffect(() => {
-    setVisibleGridCounts((current) => {
-      const next = {};
-
-      for (const group of groupedProducts) {
-        next[group.category] = current[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS;
-      }
-
-      return next;
-    });
-  }, [groupedProducts]);
+  const resolvedVisibleGridCounts = useMemo(
+    () =>
+      groupedProducts.reduce(
+        (accumulator, group) => ({
+          ...accumulator,
+          [group.category]: visibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS,
+        }),
+        {},
+      ),
+    [groupedProducts, visibleGridCounts],
+  );
 
   useEffect(() => {
     if (!revealState) {
@@ -682,7 +700,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
   }, [revealState]);
 
   useEffect(() => {
-    const authView = searchParams.get("auth") || initialAuthView;
+    const authView = authViewParam || initialAuthView;
 
     if (authView === "admin" || authView === "login") {
       setRoleTab("client");
@@ -701,7 +719,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
     setRoleTab("client");
     setShowRegister(false);
     setShowPublicShop(true);
-  }, [initialAuthView, searchParams]);
+  }, [initialAuthView, authViewParam]);
 
   function syncAuthView(view) {
     const nextUrl = view ? `/?auth=${view}` : "/";
@@ -756,7 +774,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
 
   function showMoreProducts(category) {
     setVisibleGridCounts((current) => {
-      const start = current[category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS;
+      const start = current[category] ?? resolvedVisibleGridCounts[category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS;
       setRevealState({ category, start });
 
       return {
@@ -1030,21 +1048,20 @@ export function PublicAuthGate({ initialAuthView = "" }) {
 
                         {groupedProducts.length ? (
                           <div className="space-y-6">
+                            <PublicHeroCarousel
+                              products={products.slice(0, 5)}
+                              onRequireLogin={openClientLogin}
+                            />
+
                             {groupedProducts.map((group, groupIndex) => (
                               <EntranceMotion key={group.category} delay={0.24 + groupIndex * 0.1}>
                                 <section className="space-y-4">
                                   <h2 className="px-1 text-[1.18rem] font-medium text-[var(--foreground)]">{group.category}</h2>
 
-                                  <PublicHeroCarousel
-                                    products={group.products.slice(0, 5)}
-                                    onRequireLogin={openClientLogin}
-                                    reverse={groupIndex % 2 === 1}
-                                  />
-
                                   <div className="rounded-[1.55rem]">
                                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                                       {group.products
-                                        .slice(0, visibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS)
+                                        .slice(0, resolvedVisibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS)
                                         .map((product, index) => {
                                         const isRevealed =
                                           revealState?.category === group.category &&
@@ -1067,7 +1084,7 @@ export function PublicAuthGate({ initialAuthView = "" }) {
                                     </div>
                                   </div>
 
-                                  {group.products.length > (visibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS) ? (
+                                  {group.products.length > (resolvedVisibleGridCounts[group.category] ?? PUBLIC_INITIAL_VISIBLE_PRODUCTS) ? (
                                     <div className="flex justify-center pt-1">
                                       <Button
                                         type="button"

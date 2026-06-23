@@ -11,6 +11,7 @@ import {
   Copy,
   Edit3,
   Gift,
+  Globe,
   Heart,
   MessageCircle,
   ReceiptText,
@@ -25,10 +26,12 @@ import {
 } from "lucide-react";
 
 import { useAppStore } from "@/components/app-store-provider";
+import { DeliveryLocationPicker } from "@/components/delivery-location-picker";
 import { LogoutButton } from "@/components/logout-button";
 import { easeInOutCubic } from "@/components/motion/motion-utils";
 import { Button } from "@/components/ui/button";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useTranslation } from "@/lib/translations";
 
 function Card({ children, className = "" }) {
   return (
@@ -185,6 +188,7 @@ function getProductDiscountedPrice(product) {
 }
 
 function ProductCard({ product, store }) {
+  const { t } = useTranslation(store.language);
   const isFavorite = store.isFavorite(product.id);
   const discountedPrice = getProductDiscountedPrice(product);
   const hasDiscount = product.discountPercent > 0 && discountedPrice < product.price;
@@ -245,7 +249,7 @@ function ProductCard({ product, store }) {
         </div>
 
         <p className={cn("text-xs font-medium", product.stock <= 5 ? "text-red-400" : "text-emerald-400")}>
-          {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
+          {product.stock > 0 ? t("in_stock").replace("{count}", product.stock) : t("out_of_stock")}
         </p>
 
         <Button
@@ -253,7 +257,7 @@ function ProductCard({ product, store }) {
           onClick={() => store.addToCart(product.id)}
           disabled={product.stock <= 0}
         >
-          {product.stock > 0 ? "Add to cart" : "Out of stock"}
+          {product.stock > 0 ? t("add_to_cart") : t("out_of_stock")}
         </Button>
       </div>
     </div>
@@ -301,6 +305,7 @@ function ClientHeroCarousel({ products, reverse = false }) {
   const pointerActiveRef = useRef(false);
   const currentVelocityRef = useRef(0);
   const targetVelocityRef = useRef(0);
+  const isVisibleRef = useRef(false);
   const shouldAutoScroll = products.length > 1;
   const visibleProducts = products.slice(0, 5);
   const productIdsKey = visibleProducts.map((product) => product.id).join("|");
@@ -330,7 +335,8 @@ function ClientHeroCarousel({ products, reverse = false }) {
     scrollNode.scrollLeft = cycleWidth * BASE_CYCLE_INDEX;
 
     const step = (now) => {
-      if (!scrollNode) {
+      if (!scrollNode || !isVisibleRef.current) {
+        animationRef.current = null;
         return;
       }
 
@@ -372,9 +378,25 @@ function ClientHeroCarousel({ products, reverse = false }) {
       animationRef.current = window.requestAnimationFrame(step);
     };
 
-    animationRef.current = window.requestAnimationFrame(step);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+
+        if (entry.isIntersecting && !animationRef.current) {
+          lastTimeRef.current = 0;
+          animationRef.current = window.requestAnimationFrame(step);
+        } else if (!entry.isIntersecting && animationRef.current) {
+          window.cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+          lastTimeRef.current = 0;
+        }
+      },
+      { rootMargin: "64px" },
+    );
+    observer.observe(scrollNode);
 
     return () => {
+      observer.disconnect();
       if (animationRef.current) {
         window.cancelAnimationFrame(animationRef.current);
       }
@@ -488,7 +510,7 @@ function ClientProductGrid({ products, store }) {
             className="rounded-full border-2 border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] px-5 py-2.5 text-sm shadow-none hover:border-[color-mix(in_srgb,var(--foreground)_36%,transparent)]"
             onClick={showMoreProducts}
           >
-            Show more
+            {store.t ? store.t("show_more") : "Show more"}
           </Button>
         </div>
       ) : null}
@@ -498,6 +520,7 @@ function ClientProductGrid({ products, store }) {
 
 export function ClientProductListPageView({ productsOverride = null }) {
   const store = useAppStore();
+  const { t } = useTranslation(store.language);
   const isCustomCollection = Boolean(productsOverride);
   const [query, setQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -680,32 +703,32 @@ export function ClientProductListPageView({ productsOverride = null }) {
         <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-32 rounded-full bg-[color-mix(in_srgb,var(--action)_18%,transparent)]" />
         <div className="relative">
           <h2 className="text-[1.55rem] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
-            {isCustomCollection ? "Favorites" : "Shop"}
+            {isCustomCollection ? t("favorites") : t("shop")}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--foreground)]/82">
             {isCustomCollection
-              ? "Revisit your saved grocery picks, compare deals, and move them into your cart faster."
-              : "Browse groceries, save favorites, and add products to your cart with the same faster layout as the public storefront."}
+              ? t("no_favorites_hint")
+              : t("filter_hint")}
           </p>
         </div>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[17.75rem_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[18.5rem_minmax(0,1fr)]">
-        <aside className="hidden lg:block">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_17.75rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_18.5rem]">
+        <aside className="hidden lg:order-2 lg:block">
           <div className="sticky top-6 rounded-[1.6rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_92%,var(--background-start))] p-5 shadow-[var(--shadow-soft)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-[1.4rem] font-semibold text-[var(--foreground)]">Filters</h2>
-                <p className="mt-1 text-sm text-[var(--muted-foreground)]">{products.length} grocery items</p>
+                <h2 className="text-[1.4rem] font-semibold text-[var(--foreground)]">{t("filters")}</h2>
+                <p className="mt-1 text-sm text-[var(--muted-foreground)]">{t("grocery_items").replace("{count}", products.length)}</p>
               </div>
               <button type="button" onClick={resetFilters} className="text-sm font-medium text-[var(--action)]">
-                Reset
+                {t("reset")}
               </button>
             </div>
 
             <div className="mt-6 space-y-6">
               <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-[var(--foreground)]">Sort by</h3>
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">{t("sort_by")}</h3>
                 <div className="space-y-2">
                   {CLIENT_SORT_OPTIONS.map((option) => (
                     <label key={option} className="flex cursor-pointer items-center gap-3 text-sm text-[var(--foreground)]">
@@ -723,7 +746,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-[var(--foreground)]">Quick filters</h3>
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">{t("quick_filters")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {CLIENT_QUICK_FILTER_OPTIONS.map((filter) => (
                     <button
@@ -744,7 +767,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-[var(--foreground)]">Price</h3>
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">{t("price")}</h3>
                 <div className="grid grid-cols-2 gap-2">
                   {CLIENT_PRICE_OPTIONS.map((option) => (
                     <button
@@ -766,7 +789,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
 
               <section className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Categories</h3>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">{t("categories")}</h3>
                   <span className="text-xs text-[var(--muted-foreground)]">{selectedCategories.length || sourceCategories.length}</span>
                 </div>
 
@@ -776,7 +799,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
                     <input
                       value={categorySearch}
                       onChange={(event) => setCategorySearch(event.target.value)}
-                      placeholder="Search categories"
+                      placeholder={t("search_categories")}
                       className="w-full bg-transparent outline-none placeholder:text-[var(--muted-foreground)]"
                     />
                   </label>
@@ -800,14 +823,14 @@ export function ClientProductListPageView({ productsOverride = null }) {
           </div>
         </aside>
 
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-4 lg:order-1">
           <div className="public-home-search-shell rounded-[1.1rem] p-1.5 shadow-[0_8px_22px_rgba(3,10,18,0.12)]">
             <label className="flex items-center gap-3 rounded-[1.05rem] px-4 py-3">
               <Search className="size-5 text-[var(--action)]" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search products, categories, deals"
+                placeholder={t("search_products_deals")}
                 className="w-full bg-transparent text-[1rem] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none"
               />
             </label>
@@ -845,12 +868,12 @@ export function ClientProductListPageView({ productsOverride = null }) {
 
           <div className="hidden items-center justify-between rounded-[1.2rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_88%,var(--background-start))] px-4 py-3 lg:flex">
             <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">{products.length} products ready to browse</p>
-              <p className="mt-1 text-xs text-[var(--muted-foreground)]">Filter by deals, stock, price range, and grocery category.</p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">{t("products_ready").replace("{count}", products.length)}</p>
+              <p className="mt-1 text-xs text-[var(--muted-foreground)]">{t("filter_hint")}</p>
             </div>
             {activeFilterCount ? (
               <button type="button" onClick={resetFilters} className="text-sm font-medium text-[var(--action)]">
-                Clear filters
+                {t("clear_filters")}
               </button>
             ) : null}
           </div>
@@ -860,14 +883,11 @@ export function ClientProductListPageView({ productsOverride = null }) {
               <ClientProductGrid key={productGridKey} products={products} store={store} />
             ) : (
               <div className="space-y-6">
-                {groupedProducts.map((group, groupIndex) => (
+                <ClientHeroCarousel products={products.slice(0, 5)} />
+
+                {groupedProducts.map((group) => (
                   <section key={group.category} className="space-y-4">
                     <h2 className="px-1 text-[1.18rem] font-medium text-[var(--foreground)]">{group.category}</h2>
-
-                    <ClientHeroCarousel
-                      products={group.products.slice(0, 5)}
-                      reverse={groupIndex % 2 === 1}
-                    />
 
                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                       {group.products
@@ -902,7 +922,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
                           className="rounded-full border-2 border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] px-5 py-2.5 text-sm shadow-none hover:border-[color-mix(in_srgb,var(--foreground)_36%,transparent)]"
                           onClick={() => showMoreProducts(group.category)}
                         >
-                          Show more
+                          {t("show_more")}
                         </Button>
                       </div>
                     ) : null}
@@ -912,7 +932,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
             )
           ) : (
             <div className="rounded-[1.25rem] border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface)_82%,var(--background-start))] px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
-              No matching products.
+              {t("no_matching_products")}
             </div>
           )}
         </div>
@@ -923,6 +943,7 @@ export function ClientProductListPageView({ productsOverride = null }) {
 
 export function ClientFavoritesPageView() {
   const store = useAppStore();
+  const { t } = useTranslation(store.language);
 
   if (!store.favoriteProducts.length) {
     return (
@@ -931,8 +952,8 @@ export function ClientFavoritesPageView() {
           <div className="mx-auto flex h-[4.625rem] w-[4.625rem] items-center justify-center rounded-[1.375rem] bg-[linear-gradient(135deg,#1E4540,#B57878)] text-white shadow-[var(--shadow-card)]">
             <Heart className="size-8" />
           </div>
-          <h2 className="mt-4 text-3xl font-semibold text-[var(--foreground)]">No favorites yet</h2>
-          <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">Tap the heart on any product and it will appear here.</p>
+          <h2 className="mt-4 text-3xl font-semibold text-[var(--foreground)]">{t("no_favorites_yet")}</h2>
+          <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">{t("no_favorites_hint")}</p>
         </div>
       </div>
     );
@@ -943,6 +964,7 @@ export function ClientFavoritesPageView() {
 
 export function ClientCartPageView() {
   const store = useAppStore();
+  const { t } = useTranslation(store.language);
 
   return (
     <div className="space-y-4">
@@ -961,10 +983,10 @@ export function ClientCartPageView() {
                       <h2 className="text-lg font-semibold text-[var(--foreground)]">{item.product.name}</h2>
                       <p className="mt-1 text-sm text-[var(--muted-foreground)]">
                         {item.product.discountPercent > 0
-                          ? `${formatCurrency(item.product.price * (1 - item.product.discountPercent / 100))} each (was ${formatCurrency(item.product.price)})`
-                          : `${formatCurrency(item.product.price)} each`}
+                          ? `${formatCurrency(item.product.price * (1 - item.product.discountPercent / 100))} ${t("each")} (was ${formatCurrency(item.product.price)})`
+                          : `${formatCurrency(item.product.price)} ${t("each")}`}
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">Subtotal: {formatCurrency(item.subtotal)}</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{t("subtotal")}: {formatCurrency(item.subtotal)}</p>
                     </div>
                     <div className="flex flex-col items-start gap-2 sm:items-center">
                       <div className="flex items-center">
@@ -977,7 +999,7 @@ export function ClientCartPageView() {
                         </button>
                       </div>
                       <button type="button" onClick={() => store.removeFromCart(item.productId)} className="text-sm font-medium text-[var(--action)]">
-                        Remove
+                        {t("remove")}
                       </button>
                     </div>
                   </div>
@@ -988,12 +1010,12 @@ export function ClientCartPageView() {
           <div className="rounded-t-[1.5rem] border-t border-[var(--border-soft)] bg-[linear-gradient(135deg,var(--surface-quiet),var(--surface),color-mix(in_srgb,var(--action)_12%,var(--surface)))] px-4 pb-4 pt-3 shadow-[0_-4px_16px_rgba(15,24,35,0.06)]">
             <div className="flex items-center gap-4">
               <div>
-                <p className="text-lg font-bold text-[var(--foreground)]">Total</p>
+                <p className="text-lg font-bold text-[var(--foreground)]">{t("total")}</p>
                 <p className="mt-1 text-2xl font-extrabold text-[var(--foreground)]">{formatCurrency(store.cartTotal)}</p>
               </div>
               <div className="ml-auto">
-                <Link href="/client/checkout" className="inline-flex items-center justify-center rounded-xl bg-[var(--action)] px-[1.125rem] py-[0.875rem] text-sm font-semibold text-[var(--action-foreground)] shadow-[var(--shadow-soft)]">
-                  Proceed to checkout
+                <Link href="/client/checkout" prefetch={false} className="inline-flex items-center justify-center rounded-xl bg-[var(--action)] px-[1.125rem] py-[0.875rem] text-sm font-semibold text-[var(--action-foreground)] shadow-[var(--shadow-soft)]">
+                  {t("proceed_to_checkout")}
                 </Link>
               </div>
             </div>
@@ -1001,7 +1023,7 @@ export function ClientCartPageView() {
         </>
       ) : (
         <div className="flex min-h-[14rem] items-center justify-center px-4 text-center text-[var(--muted-foreground)]">
-          Your cart is empty. Add products from the shop tab.
+          {t("cart_empty_hint")}
         </div>
       )}
     </div>
@@ -1010,39 +1032,53 @@ export function ClientCartPageView() {
 
 export function ClientCheckoutPageView() {
   const store = useAppStore();
+  const { t } = useTranslation(store.language);
   const router = useRouter();
   const [shippingAddress, setShippingAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Cash on delivery");
   const [couponCode, setCouponCode] = useState("");
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
     if (shippingAddress.trim().length < 8) {
-      setMessage("Please enter a full shipping address.");
+      setMessage(t("shipping_address_hint"));
       return;
     }
+
+    if (!store.cartItems.length) {
+      setMessage(t("cart_empty_hint"));
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage("");
+
     const result = await store.placeOrder({
       shippingAddress: shippingAddress.trim(),
       paymentMethod,
       couponCode: couponCode.trim(),
     });
+
+    setSubmitting(false);
+
     if (!result.success || !result.order) {
       setMessage(result.message || "Unable to place order.");
       return;
     }
+
     setMessage(`Order ${result.order.id} placed successfully.`);
-    router.push("/client/order-history");
-    router.refresh();
+    router.push("/client?tab=orders");
   }
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <Card>
-          <h2 className="text-xl font-semibold text-[var(--foreground)]">Order summary</h2>
+          <h2 className="text-xl font-semibold text-[var(--foreground)]">{t("order_summary")}</h2>
           <div className="mt-4 space-y-3">
             <div className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-[var(--muted-foreground)]">Items</span>
+              <span className="text-[var(--muted-foreground)]">{t("items")}</span>
               <span className="font-semibold text-[var(--foreground)]">{store.cartItems.length}</span>
             </div>
             {store.cartItems.map((item) => (
@@ -1055,34 +1091,45 @@ export function ClientCheckoutPageView() {
             ))}
           </div>
           <div className="mt-5 border-t border-white/50 pt-4">
-            <p className="text-sm text-[var(--muted-foreground)]">Total</p>
+            <p className="text-sm text-[var(--muted-foreground)]">{t("total")}</p>
             <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{formatCurrency(store.cartTotal)}</p>
           </div>
         </Card>
         <Card>
-          <h2 className="text-xl font-semibold text-[var(--foreground)]">Delivery details</h2>
+          <h2 className="text-xl font-semibold text-[var(--foreground)]">{t("delivery_details")}</h2>
           <div className="mt-4 space-y-4">
-            <textarea value={shippingAddress} onChange={(event) => setShippingAddress(event.target.value)} placeholder="Shipping address" className="app-input min-h-32 px-4 py-3 text-sm" />
+            <DeliveryLocationPicker
+              onAddressSelect={setShippingAddress}
+              locateLabel={t("use_current_location")}
+              pickLabel={t("pick_on_map")}
+              hint={t("map_location_hint")}
+            />
+            <textarea
+              value={shippingAddress}
+              onChange={(event) => setShippingAddress(event.target.value)}
+              placeholder={t("shipping_address")}
+              className="app-input min-h-32 px-4 py-3 text-sm"
+            />
             <div className="rounded-[1.125rem] border border-[color:color-mix(in_srgb,var(--border-soft)_85%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--action)_12%,var(--surface)),color-mix(in_srgb,var(--accent-secondary)_35%,var(--surface)))] p-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-white/35 p-2 text-[var(--foreground)]">
                   <Ticket className="size-5" />
                 </div>
                 <p className="text-sm leading-6 text-[var(--foreground)]/88">
-                  Have a promo code from your coupon wallet or a campaign? Enter it below and the backend will validate the discount when you place the order.
+                  {t("coupon_hint")}
                 </p>
               </div>
             </div>
-            <input value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder="Enter coupon (optional)" className="app-input px-4 py-3 text-sm" />
-            <p className="text-xs leading-6 text-[var(--muted-foreground)]">Copy a code from Profile &gt; Coupon wallet and paste it here. Each account can redeem a coupon only once.</p>
+            <input value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder={t("enter_coupon")} className="app-input px-4 py-3 text-sm" />
+            <p className="text-xs leading-6 text-[var(--muted-foreground)]">{t("coupon_wallet_note")}</p>
             <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="app-select px-4 py-3 text-sm">
-              <option>Cash on delivery</option>
-              <option>Credit card</option>
-              <option>Bank transfer</option>
+              <option>{t("cash_on_delivery")}</option>
+              <option>{t("credit_card")}</option>
+              <option>{t("bank_transfer")}</option>
             </select>
             {message ? <div className="rounded-2xl bg-[var(--surface-quiet)] px-4 py-3 text-sm">{message}</div> : null}
-            <Button type="submit" className="w-full">
-              Place order securely
+            <Button type="submit" className="w-full" disabled={submitting || !store.cartItems.length}>
+              {submitting ? t("placing_order") : t("place_order")}
             </Button>
           </div>
         </Card>
@@ -1163,23 +1210,23 @@ export function ClientOrderHistoryPageView() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search order ID, address, payment, product"
+              placeholder={store.t ? store.t("search_order") : "Search order ID, address, payment, product"}
               className="w-full bg-transparent text-sm outline-none"
             />
           </label>
           <select value={status} onChange={(event) => setStatus(event.target.value)} className="app-select px-4 py-3 text-sm">
-            <option value="all">All status</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="all">{store.t ? store.t("all_status") : "All status"}</option>
+            <option value="pending">{store.t ? store.t("status_pending") : "Pending"}</option>
+            <option value="processing">{store.t ? store.t("status_processing") : "Processing"}</option>
+            <option value="shipped">{store.t ? store.t("status_shipped") : "Shipped"}</option>
+            <option value="delivered">{store.t ? store.t("status_delivered") : "Delivered"}</option>
+            <option value="cancelled">{store.t ? store.t("status_cancelled") : "Cancelled"}</option>
           </select>
           <select value={sort} onChange={(event) => setSort(event.target.value)} className="app-select px-4 py-3 text-sm">
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-            <option value="total-high">Total high-low</option>
-            <option value="total-low">Total low-high</option>
+            <option value="newest">{store.t ? store.t("newest") : "Newest"}</option>
+            <option value="oldest">{store.t ? store.t("oldest") : "Oldest"}</option>
+            <option value="total-high">{store.t ? store.t("total_high") : "Total high-low"}</option>
+            <option value="total-low">{store.t ? store.t("total_low") : "Total low-high"}</option>
           </select>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
@@ -1298,6 +1345,9 @@ export function ClientProfilePageView({ user }) {
   const [copiedCoupon, setCopiedCoupon] = useState("");
   const [walletOpen, setWalletOpen] = useState(false);
 
+  const lang = store.language || "en";
+  const { t } = useTranslation(lang);
+
   const userTickets = store.supportTickets.filter(
     (ticket) => ticket.messages.some((entry) => entry.authorEmail === user.email) || ticket.messages[0]?.authorEmail === user.email,
   );
@@ -1374,6 +1424,34 @@ export function ClientProfilePageView({ user }) {
             <div>
               <p className="font-medium text-[var(--foreground)]">Delivery preferences</p>
               <p className="mt-1 text-sm text-[var(--muted-foreground)]">Standard delivery - 2 to 3 days</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-4">
+            <Globe className="size-5 text-[var(--action)]" />
+            <div className="flex-1">
+              <p className="font-medium text-[var(--foreground)]">{t("change_language")}</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => store.setLanguage("en")}
+                  className={cn(
+                    "rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all duration-200",
+                    lang === "en" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  )}
+                >
+                  {t("english")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => store.setLanguage("km")}
+                  className={cn(
+                    "rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all duration-200",
+                    lang === "km" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  )}
+                >
+                  {t("khmer")}
+                </button>
+              </div>
             </div>
           </div>
         </div>

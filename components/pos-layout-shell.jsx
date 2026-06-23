@@ -1,12 +1,15 @@
 "use client";
 
-import { BarChart3, Home, Menu, Package, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShoppingCart, X } from "lucide-react";
+import { BarChart3, Home, LogOut, Menu, Package, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShoppingCart, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useOffline } from "@/hooks/useOffline";
 import { usePosStore } from "@/store/posStore";
+import { usePOSSettings } from "@/hooks/usePOSSettings";
+import { useTranslation } from "@/lib/translations";
 
 const navItems = [
   { label: "Dashboard", href: "/pos", icon: Home },
@@ -19,20 +22,33 @@ const navItems = [
 
 export function PosLayoutShell({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { isOnline, isOffline } = useOffline();
   const pendingSyncCount = usePosStore((state) => state.pendingSyncCount);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  const { settings } = usePOSSettings();
+  const lang = settings?.appearance?.defaultLanguage || "en";
+  const { t } = useTranslation(lang);
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
+
   function renderNavLink(item, compact = false, onNavigate) {
     const active = pathname === item.href;
     const Icon = item.icon;
+    const key = item.label.toLowerCase().replace(" ", "_");
+    const label = t(key) || item.label;
 
     return (
       <Link
         key={item.href}
         href={item.href}
-        title={compact ? item.label : undefined}
+        title={compact ? label : undefined}
         onClick={onNavigate}
         className={
           active
@@ -42,7 +58,7 @@ export function PosLayoutShell({ children }) {
       >
         <span className={compact ? "flex w-full justify-center" : "flex min-w-0 items-center gap-3"}>
           <Icon className="size-5 shrink-0" aria-hidden="true" />
-          {compact ? null : <span className="truncate">{item.label}</span>}
+          {compact ? null : <span className="truncate">{label}</span>}
         </span>
         {!compact && item.label === "Orders" && pendingSyncCount > 0 ? (
           <span className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-black text-amber-950">{pendingSyncCount}</span>
@@ -65,9 +81,9 @@ export function PosLayoutShell({ children }) {
         <div className={sidebarCollapsed ? "flex flex-col items-center gap-3" : "flex items-start justify-between gap-3"}>
           <div className={sidebarCollapsed ? "text-center" : ""}>
             <p className={sidebarCollapsed ? "text-xs font-black uppercase tracking-[0.08em] text-emerald-700" : "text-xs font-bold uppercase tracking-[0.24em] text-emerald-700"}>
-              {sidebarCollapsed ? "MS" : "MyShop"}
+              {sidebarCollapsed ? "MS" : (settings?.storeInfo?.storeName || "MyShop")}
             </p>
-            {sidebarCollapsed ? null : <h1 className="mt-2 text-2xl font-black tracking-tight">POS Terminal</h1>}
+            {sidebarCollapsed ? null : <h1 className="mt-2 text-2xl font-black tracking-tight">{t("pos")} Terminal</h1>}
           </div>
           <button
             type="button"
@@ -83,15 +99,28 @@ export function PosLayoutShell({ children }) {
         <nav className="mt-8 space-y-2">{navItems.map((item) => renderNavLink(item, sidebarCollapsed))}</nav>
 
         <div className={sidebarCollapsed ? "mt-auto rounded-2xl border border-slate-200 bg-slate-50 p-3" : "mt-auto rounded-2xl border border-slate-200 bg-slate-50 p-4"}>
-          <div className={sidebarCollapsed ? "flex justify-center" : "flex items-center justify-between gap-3"}>
+          <div className={sidebarCollapsed ? "flex flex-col items-center gap-3" : "flex items-center justify-between gap-3"}>
             <div className={sidebarCollapsed ? "flex items-center justify-center" : "flex items-center gap-2 text-sm font-bold"}>
-              <span className={isOnline ? "size-3 rounded-full bg-emerald-500" : "size-3 rounded-full bg-red-500"} title={isOffline ? "Offline" : "Online"} />
-              {sidebarCollapsed ? null : isOffline ? "Offline" : "Online"}
+              <span className={isOnline ? "size-3 rounded-full bg-emerald-500" : "size-3 rounded-full bg-red-500"} title={isOffline ? t("offline") : t("online")} />
+              {sidebarCollapsed ? null : isOffline ? t("offline") : t("online")}
             </div>
             {!sidebarCollapsed && pendingSyncCount > 0 ? (
-              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">{pendingSyncCount} pending</span>
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">{pendingSyncCount} {t("pending")}</span>
             ) : null}
           </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            title="Log out"
+            className={
+              sidebarCollapsed
+                ? "mt-3 flex w-full items-center justify-center rounded-xl border border-red-200 bg-red-50 p-2.5 text-red-600 transition hover:bg-red-100"
+                : "mt-3 flex w-full items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-100"
+            }
+          >
+            <LogOut className="size-4 shrink-0" />
+            {sidebarCollapsed ? null : t("logout") || "Log Out"}
+          </button>
         </div>
       </aside>
 
@@ -102,11 +131,22 @@ export function PosLayoutShell({ children }) {
               <Menu className="size-5" />
             </button>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">MyShop</p>
-              <p className="text-lg font-black">POS</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">{settings?.storeInfo?.storeName || "MyShop"}</p>
+              <p className="text-lg font-black">{t("pos")}</p>
             </div>
           </div>
-          <span className={isOnline ? "size-3 rounded-full bg-emerald-500" : "size-3 rounded-full bg-red-500"} />
+          <div className="flex items-center gap-3">
+            <span className={isOnline ? "size-3 rounded-full bg-emerald-500" : "size-3 rounded-full bg-red-500"} />
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="Log out"
+              aria-label="Log out"
+              className="grid size-10 place-items-center rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -115,8 +155,8 @@ export function PosLayoutShell({ children }) {
           <aside className="flex h-full w-72 max-w-[82vw] flex-col bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-700">MyShop</p>
-                <h1 className="mt-2 text-2xl font-black tracking-tight">POS Terminal</h1>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-700">{settings?.storeInfo?.storeName || "MyShop"}</p>
+                <h1 className="mt-2 text-2xl font-black tracking-tight">{t("pos")} Terminal</h1>
               </div>
               <button type="button" onClick={() => setMobileSidebarOpen(false)} className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-700" aria-label="Close sidebar">
                 <X className="size-5" />
@@ -127,12 +167,20 @@ export function PosLayoutShell({ children }) {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold">
                   <span className={isOnline ? "size-3 rounded-full bg-emerald-500" : "size-3 rounded-full bg-red-500"} />
-                  {isOffline ? "Offline" : "Online"}
+                  {isOffline ? t("offline") : t("online")}
                 </div>
                 {pendingSyncCount > 0 ? (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">{pendingSyncCount} pending</span>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">{pendingSyncCount} {t("pending")}</span>
                 ) : null}
               </div>
+              <button
+                type="button"
+                onClick={() => { setMobileSidebarOpen(false); handleLogout(); }}
+                className="mt-3 flex w-full items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-100"
+              >
+                <LogOut className="size-4 shrink-0" />
+                {t("logout") || "Log Out"}
+              </button>
             </div>
           </aside>
         </div>

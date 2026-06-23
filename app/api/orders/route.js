@@ -1,5 +1,5 @@
 import { fail, handleRouteError, ok } from "@/lib/api-response";
-import { createAuditLog, createInventoryMovement } from "@/lib/business-events";
+import { calculateDeposits, createAuditLog, createInventoryMovement } from "@/lib/business-events";
 import { canAccessPOS, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeOrder } from "@/lib/serializers";
@@ -14,7 +14,9 @@ function mapCouponType(type) {
   if (!type) {
     return null;
   }
-  return type === "percent" ? "PERCENT" : "FIXED";
+
+  const normalized = String(type).toUpperCase();
+  return normalized === "PERCENT" ? "PERCENT" : "FIXED";
 }
 
 export async function GET(request) {
@@ -147,18 +149,44 @@ export async function POST(request) {
         : Number(Math.min(Number(coupon.value), subtotal).toFixed(2))
       : 0;
 
+    // Resolve branchId
+    let branchId = body.branchId;
+    if (!branchId) {
+      const defaultBranch = await prisma.branch.findFirst({
+        where: { code: "HQ" },
+      });
+      branchId = defaultBranch?.id;
+    }
+
+    if (!branchId) {
+      return fail("Store branch is not configured. Please contact support.", 503);
+    }
+
     const order = await prisma.$transaction(async (tx) => {
+      // Resolve Customer profile by user email
+      const customer = await tx.customer.findFirst({
+        where: { email: user.email },
+      });
+
+      // Calculate deposits
+      const { totalDeposit } = await calculateDeposits(tx, normalizedLines.map(line => ({
+        productId: line.product.id,
+        quantity: line.quantity,
+      })));
+
       const created = await tx.order.create({
         data: {
           userId: user.id,
+          customerId: customer?.id || null,
+          branchId,
           channel: "ONLINE",
           shippingAddress,
           paymentMethod,
           subtotal,
-          total: subtotal - couponDiscount,
+          total: subtotal - couponDiscount + totalDeposit,
           status: "PENDING",
           couponCode: coupon?.code || null,
-          couponType: mapCouponType(coupon?.type.toLowerCase()),
+          couponType: coupon ? mapCouponType(coupon.type) : null,
           couponValue: coupon ? Number(coupon.value) : null,
           couponDiscount,
           lines: {
@@ -177,9 +205,17 @@ export async function POST(request) {
       });
 
       for (const line of normalizedLines) {
-        const stockUpdate = await tx.product.updateMany({
+        // Ensure branch inventory record exists
+        await tx.inventory.upsert({
+          where: { productId_branchId: { productId: line.product.id, branchId } },
+          update: {},
+          create: { productId: line.product.id, branchId, stock: line.product.stock },
+        });
+
+        const stockUpdate = await tx.inventory.updateMany({
           where: {
-            id: line.product.id,
+            productId: line.product.id,
+            branchId,
             stock: {
               gte: line.quantity,
             },
@@ -195,23 +231,31 @@ export async function POST(request) {
           throw new Error("INSUFFICIENT_STOCK");
         }
 
-        const updatedProduct = await tx.product.findUnique({
-          where: {
-            id: line.product.id,
+        // Sync fallback global stock
+        await tx.product.update({
+          where: { id: line.product.id },
+          data: {
+            stock: {
+              decrement: line.quantity,
+            },
           },
-          select: {
-            stock: true,
+        });
+
+        const updatedInventory = await tx.inventory.findUnique({
+          where: {
+            productId_branchId: { productId: line.product.id, branchId },
           },
         });
 
         await createInventoryMovement(tx, {
           productId: line.product.id,
+          branchId,
           orderId: created.id,
           type: "RESERVATION",
           channel: "ONLINE",
           quantity: line.quantity,
-          previousStock: Number(updatedProduct.stock) + line.quantity,
-          nextStock: Number(updatedProduct.stock),
+          previousStock: Number(updatedInventory.stock) + line.quantity,
+          nextStock: Number(updatedInventory.stock),
           note: "Online order inventory reservation",
           userId: user.id,
         });

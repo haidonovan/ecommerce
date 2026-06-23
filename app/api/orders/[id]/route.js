@@ -1,14 +1,102 @@
 import { fail, handleRouteError, ok } from "@/lib/api-response";
-import { createAuditLog } from "@/lib/business-events";
+import { createAuditLog, createInventoryMovement } from "@/lib/business-events";
 import { canAccessPOS, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeOrder } from "@/lib/serializers";
 
 function mapStatus(status) {
   const normalized = String(status || "").toUpperCase();
-  return ["PENDING", "CONFIRMED", "PROCESSING", "PREPARING", "READY", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED"].includes(normalized)
+  return ["PENDING", "CONFIRMED", "PICKING", "PACKING", "READY", "COMPLETED", "CANCELLED", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED"].includes(
+    normalized,
+  )
     ? normalized
     : null;
+}
+
+async function allocateFefoBatches(tx, { order, userId }) {
+  if (order.channel !== "ONLINE" || !order.branchId) {
+    return;
+  }
+
+  const alreadyAllocated = await tx.inventoryMovement.count({
+    where: {
+      orderId: order.id,
+      type: "STOCK_OUT",
+      note: {
+        contains: "FEFO picking",
+      },
+    },
+  });
+
+  if (alreadyAllocated > 0) {
+    return;
+  }
+
+  for (const line of order.lines) {
+    let remaining = line.quantity;
+    const batches = await tx.inventoryBatch.findMany({
+      where: {
+        productId: line.productId,
+        branchId: order.branchId,
+        qty: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        {
+          expiryDate: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
+    });
+
+    for (const batch of batches) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      const deductQty = Math.min(batch.qty, remaining);
+      const batchUpdate = await tx.inventoryBatch.updateMany({
+        where: {
+          id: batch.id,
+          qty: {
+            gte: deductQty,
+          },
+        },
+        data: {
+          qty: {
+            decrement: deductQty,
+          },
+        },
+      });
+
+      if (batchUpdate.count !== 1) {
+        throw new Error("INSUFFICIENT_BATCH_STOCK");
+      }
+
+      await createInventoryMovement(tx, {
+        productId: line.productId,
+        branchId: order.branchId,
+        batchId: batch.id,
+        orderId: order.id,
+        type: "STOCK_OUT",
+        channel: "ONLINE",
+        quantity: deductQty,
+        previousStock: batch.qty,
+        nextStock: batch.qty - deductQty,
+        note: "FEFO picking batch allocation",
+        userId,
+      });
+
+      remaining -= deductQty;
+    }
+
+    if (remaining > 0) {
+      throw new Error("INSUFFICIENT_BATCH_STOCK");
+    }
+  }
 }
 
 export async function PATCH(request, { params }) {
@@ -32,16 +120,20 @@ export async function PATCH(request, { params }) {
         where: {
           id,
         },
-        select: {
-          status: true,
-          trackingNumber: true,
-          trackingCarrier: true,
-          trackingStatus: true,
+        include: {
+          lines: true,
         },
       });
 
       if (!existing) {
         throw Object.assign(new Error("ORDER_NOT_FOUND"), { code: "P2025" });
+      }
+
+      if (nextStatus === "PICKING" && existing.status !== "PICKING") {
+        await allocateFefoBatches(tx, {
+          order: existing,
+          userId: user.id,
+        });
       }
 
       const next = await tx.order.update({
@@ -67,7 +159,12 @@ export async function PATCH(request, { params }) {
         action: body.status !== undefined && existing.status !== next.status ? "STATUS_CHANGE" : "UPDATE",
         module: "orders",
         recordId: id,
-        oldValue: existing,
+        oldValue: {
+          status: existing.status,
+          trackingNumber: existing.trackingNumber,
+          trackingCarrier: existing.trackingCarrier,
+          trackingStatus: existing.trackingStatus,
+        },
         newValue: {
           status: next.status,
           trackingNumber: next.trackingNumber,
@@ -83,6 +180,10 @@ export async function PATCH(request, { params }) {
       data: serializeOrder(updated),
     });
   } catch (error) {
+    if (error?.message === "INSUFFICIENT_BATCH_STOCK") {
+      return fail("Not enough batch stock is available for FEFO picking.", 409);
+    }
+
     return handleRouteError(error, "Unable to update order.", {
       notFoundMessage: "Order not found.",
     });

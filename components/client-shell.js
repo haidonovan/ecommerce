@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
+  Globe,
   Heart,
   Menu,
   ReceiptText,
@@ -16,9 +17,10 @@ import {
 import { useAppStore } from "@/components/app-store-provider";
 import { ClientCartPageView, ClientFavoritesPageView, ClientOrderHistoryPageView, ClientProductListPageView, ClientProfilePageView } from "@/components/client-pages";
 import { LogoutButton } from "@/components/logout-button";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { easeInOutCubic } from "@/components/motion/motion-utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/translations";
 
 const clientTabs = [
   { key: "shop", label: "Shop", icon: Store },
@@ -30,6 +32,10 @@ const clientTabs = [
 
 function resolveClientTab(value) {
   return clientTabs.some((tab) => tab.key === value) ? value : "shop";
+}
+
+function clientTabHref(tab) {
+  return tab === "shop" ? "/client" : `/client?tab=${tab}`;
 }
 
 function DrawerButton({ active, icon: Icon, label, onClick }) {
@@ -51,31 +57,46 @@ function DrawerButton({ active, icon: Icon, label, onClick }) {
 
 export function ClientShell({ user, initialTab = "shop" }) {
   const store = useAppStore();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedTab, setSelectedTab] = useState(() => resolveClientTab(searchParams.get("tab") || initialTab));
 
-  const selectedTab = resolveClientTab(searchParams.get("tab") || initialTab);
+  const lang = store.language || "en";
+  const { t } = useTranslation(lang);
+
+  useEffect(() => {
+    function syncTabFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedTab(resolveClientTab(params.get("tab") || initialTab));
+    }
+
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, [initialTab]);
 
   const title = useMemo(() => {
     switch (selectedTab) {
       case "favorites":
-        return "Favorites";
+        return t("favorites");
       case "cart":
-        return "Cart";
+        return t("cart");
       case "orders":
-        return "Orders";
+        return t("orders");
       case "profile":
-        return "Profile";
+        return t("profile");
       default:
-        return "Shop";
+        return t("shop");
     }
-  }, [selectedTab]);
+  }, [selectedTab, t]);
 
   function openTab(tab) {
-    const href = tab === "shop" ? "/client" : `/client?tab=${tab}`;
-    router.push(href);
+    const nextTab = resolveClientTab(tab);
+    setSelectedTab(nextTab);
     setDrawerOpen(false);
+
+    if (typeof window !== "undefined") {
+      window.history.replaceState(window.history.state, "", clientTabHref(nextTab));
+    }
   }
 
   function renderContent() {
@@ -94,14 +115,14 @@ export function ClientShell({ user, initialTab = "shop" }) {
   }
 
   return (
-    <main className="app-shell pb-24 min-[600px]:pb-28">
+    <main className="app-shell">
       <header className="app-bar px-5 py-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="app-icon-button p-2 min-[600px]:hidden"
+              className="app-icon-button p-2"
               aria-label="Open navigation"
             >
               <Menu className="size-5" />
@@ -110,6 +131,16 @@ export function ClientShell({ user, initialTab = "shop" }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => store.setLanguage(lang === "en" ? "km" : "en")}
+              className="app-icon-button flex items-center gap-1.5 px-3 py-2 text-xs font-black text-[var(--foreground)]"
+              aria-label={t("change_language")}
+              title={t("change_language")}
+            >
+              <Globe className="size-3.5" />
+              <span>{lang === "en" ? "EN" : "ខ្មែរ"}</span>
+            </button>
             <ThemeToggle />
             {selectedTab !== "cart" ? (
               <button
@@ -131,9 +162,24 @@ export function ClientShell({ user, initialTab = "shop" }) {
         </div>
       </header>
 
-      {drawerOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/35 min-[600px]:hidden">
-          <div className="h-full w-[18rem] bg-[var(--background-start)] p-4 shadow-[var(--shadow-strong)]">
+      <AnimatePresence>
+        {drawerOpen ? (
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/35"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: easeInOutCubic }}
+            onClick={() => setDrawerOpen(false)}
+          >
+            <motion.div
+              className="h-full w-[18rem] bg-[var(--background-start)] p-4 shadow-[var(--shadow-strong)]"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ duration: 0.36, ease: easeInOutCubic }}
+              onClick={(event) => event.stopPropagation()}
+            >
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Client</p>
@@ -150,45 +196,16 @@ export function ClientShell({ user, initialTab = "shop" }) {
             </div>
             <div className="space-y-2">
               {clientTabs.map((tab) => (
-                <DrawerButton key={tab.key} active={selectedTab === tab.key} icon={tab.icon} label={tab.label} onClick={() => openTab(tab.key)} />
+                <DrawerButton key={tab.key} active={selectedTab === tab.key} icon={tab.icon} label={t(tab.key)} onClick={() => openTab(tab.key)} />
               ))}
             </div>
             <LogoutButton className="mt-5 w-full" />
-          </div>
-        </div>
-      ) : null}
-
-      <div className="pt-6">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedTab}
-            initial={{ opacity: 0, x: 18, scale: 0.98 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -12, scale: 0.98 }}
-            transition={{ duration: 0.48, ease: easeInOutCubic }}
-          >
-            {renderContent()}
+            </motion.div>
           </motion.div>
-        </AnimatePresence>
-      </div>
+        ) : null}
+      </AnimatePresence>
 
-      <nav className="app-nav-surface fixed bottom-4 left-4 right-4 z-30 hidden items-center justify-between p-2 min-[600px]:flex lg:left-6 lg:right-6">
-        {clientTabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => openTab(tab.key)}
-            className={cn(
-              "app-nav-button flex min-w-0 flex-1 flex-col items-center gap-1 px-3 py-3 text-xs font-semibold",
-              selectedTab === tab.key && "bg-[color-mix(in_srgb,var(--action)_14%,var(--surface))] text-[var(--foreground)]",
-            )}
-            data-active={selectedTab === tab.key}
-          >
-            <tab.icon className="size-4" />
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <div className="pt-6">{renderContent()}</div>
     </main>
   );
 }

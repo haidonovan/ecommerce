@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
 
 import { fallbackProducts } from "@/lib/fallback-data";
 import { readOfflineAppState, saveOfflineAppState } from "@/lib/offline-db";
@@ -21,6 +20,7 @@ function createInitialState() {
     orders: [],
     supportTickets: [],
     coupons: [],
+    language: "en",
   };
 }
 
@@ -61,7 +61,6 @@ function isLocalOnlyId(id) {
 
 export function AppStoreProvider({ children }) {
   const [state, setState] = useState(createInitialState);
-  const pathname = usePathname();
 
   async function readJson(endpoint, fallback) {
     try {
@@ -143,21 +142,22 @@ export function AppStoreProvider({ children }) {
     return () => {
       active = false;
     };
-  }, [pathname]);
+  }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    saveOfflineAppState(state);
-  }, [state]);
+  // useEffect(() => {
+  //   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  //   saveOfflineAppState(state);
+  // }, [state]);
 
   const value = useMemo(() => {
     const products = state.products;
+    const productsById = new Map(products.map((product) => [product.id, product]));
     const activeProducts = products.filter((product) => product.isActive);
     const categories = ["All", ...new Set(products.map((product) => product.category))];
     const favoriteProducts = products.filter((product) => state.favorites.includes(product.id));
     const cartItems = state.cart
       .map((item) => {
-        const product = products.find((entry) => entry.id === item.productId);
+        const product = productsById.get(item.productId);
         if (!product) {
           return null;
         }
@@ -205,6 +205,7 @@ export function AppStoreProvider({ children }) {
 
     return {
       ...state,
+      language: state.language || "en",
       products,
       activeProducts,
       categories,
@@ -212,8 +213,14 @@ export function AppStoreProvider({ children }) {
       cartItems,
       cartCount,
       cartTotal,
+      setLanguage(language) {
+        patch((current) => ({
+          ...current,
+          language,
+        }));
+      },
       getProduct(id) {
-        return products.find((product) => product.id === id) || null;
+        return productsById.get(id) || null;
       },
       isFavorite(id) {
         return state.favorites.includes(id);

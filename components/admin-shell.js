@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   BarChart3,
+  Bell,
   Boxes,
   ClipboardList,
   LayoutDashboard,
@@ -69,6 +71,9 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
   const searchParams = useSearchParams();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationAlerts, setNotificationAlerts] = useState([]);
+  const [notificationTotal, setNotificationTotal] = useState(0);
   const [lastAlertSignature, setLastAlertSignature] = useState("");
 
   const selectedTab = resolveAdminTab(searchParams.get("tab") || initialTab);
@@ -175,6 +180,44 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
     return () => window.clearTimeout(openTimer);
   }, [activeAlerts, alertOpen, lastAlertSignature]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadNotifications() {
+      try {
+        const response = await fetch("/api/notifications", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+
+        if (!mounted) {
+          return;
+        }
+
+        setNotificationAlerts(Array.isArray(payload.alerts) ? payload.alerts : []);
+        setNotificationTotal(Number(payload.total || 0));
+      } catch {
+        if (mounted) {
+          setNotificationAlerts([]);
+          setNotificationTotal(0);
+        }
+      }
+    }
+
+    loadNotifications();
+    const interval = window.setInterval(loadNotifications, 60000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   return (
     <main className="app-shell">
       <header className="app-bar px-5 py-4">
@@ -183,7 +226,7 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="app-icon-button p-2 min-[700px]:hidden"
+              className="app-icon-button p-2"
               aria-label="Open navigation"
             >
               <Menu className="size-5" />
@@ -191,15 +234,81 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
             <h1 className="text-2xl font-semibold text-[var(--foreground)]">{title}</h1>
           </div>
           <div className="flex items-center gap-2">
+            <span className="hidden max-w-[12rem] truncate text-sm font-semibold text-[var(--muted-foreground)] min-[700px]:inline">
+              {user?.name || user?.email || "Admin"}
+            </span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotificationOpen((value) => !value)}
+                className="app-icon-button relative p-2"
+                aria-label="Open notifications"
+              >
+                <Bell className="size-5" />
+                {notificationTotal > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[0.68rem] font-bold text-white">
+                    {notificationTotal > 99 ? "99+" : notificationTotal}
+                  </span>
+                ) : null}
+              </button>
+
+              {notificationOpen ? (
+                <div className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-[1.2rem] border border-[var(--border-soft)] bg-[var(--surface)] shadow-[var(--shadow-strong)]">
+                  <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--foreground)]">Notifications</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">Inventory and expiry alerts</p>
+                    </div>
+                    <span className="rounded-full bg-[color-mix(in_srgb,var(--action)_14%,var(--surface))] px-2 py-1 text-xs font-bold text-[var(--foreground)]">
+                      {notificationTotal}
+                    </span>
+                  </div>
+                  <div className="max-h-[22rem] overflow-y-auto p-2">
+                    {notificationAlerts.length ? (
+                      notificationAlerts.slice(0, 10).map((alert) => (
+                        <Link
+                          key={alert.id}
+                          href={alert.href || "/admin"}
+                          onClick={() => setNotificationOpen(false)}
+                          className="block rounded-2xl px-3 py-3 text-sm hover:bg-[color-mix(in_srgb,var(--action)_9%,transparent)]"
+                        >
+                          <span className={cn("block font-semibold", alert.severity === "danger" ? "text-rose-600" : "text-amber-600")}>
+                            {alert.type === "expired" || alert.type === "out_of_stock" ? "Critical" : "Warning"}
+                          </span>
+                          <span className="mt-1 block leading-6 text-[var(--foreground)]">{alert.message}</span>
+                        </Link>
+                      ))
+                    ) : (
+                      <p className="px-3 py-8 text-center text-sm text-[var(--muted-foreground)]">No alerts right now.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <ThemeToggle />
             <LogoutButton className="hidden min-[700px]:inline-flex" iconOnly />
           </div>
         </div>
       </header>
 
-      {drawerOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/35 min-[700px]:hidden">
-          <div className="h-full w-[18rem] bg-[var(--background-start)] p-4 shadow-[var(--shadow-strong)]">
+      <AnimatePresence>
+        {drawerOpen ? (
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/35"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: easeInOutCubic }}
+            onClick={() => setDrawerOpen(false)}
+          >
+            <motion.div
+              className="h-full w-[18rem] bg-[var(--background-start)] p-4 shadow-[var(--shadow-strong)]"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ duration: 0.36, ease: easeInOutCubic }}
+              onClick={(event) => event.stopPropagation()}
+            >
             <div className="mb-4 flex items-center justify-between">
               <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">Admin</p>
               <button
@@ -217,33 +326,12 @@ export function AdminShell({ user, initialTab = "dashboard" }) {
               ))}
             </div>
             <LogoutButton className="mt-5 w-full" />
-          </div>
-        </div>
-      ) : null}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-      <section className="grid gap-6 pt-6 min-[700px]:grid-cols-[6rem_minmax(0,1fr)]">
-        <aside className="hidden min-[700px]:block">
-          <div className="app-nav-surface p-3">
-            <div className="space-y-2">
-              {adminTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => openTab(tab.key)}
-                  className={cn(
-                    "app-nav-button flex w-full flex-col items-center gap-2 px-2 py-4 text-xs font-semibold",
-                    selectedTab === tab.key && "bg-[color-mix(in_srgb,var(--action)_14%,var(--surface))] text-[var(--foreground)]",
-                  )}
-                  data-active={selectedTab === tab.key}
-                >
-                  <tab.icon className="size-5" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside>
-
+      <section className="pt-6">
         <div className="min-w-0">
           <AnimatePresence mode="wait">
             <motion.div
