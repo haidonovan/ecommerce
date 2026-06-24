@@ -192,10 +192,10 @@ export function PosShell() {
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold",
+                            "app-chip inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold",
                 online
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border-amber-200 bg-amber-50 text-amber-800",
+                              ? "bg-[var(--primary-fixed)] text-[var(--on-primary-fixed)] border-[var(--outline-variant)]"
+                              : "bg-[var(--secondary-fixed)] text-[var(--on-secondary-fixed)] border-[var(--outline-variant)]",
               )}
             >
               {onlineStatusReady && !online ? <WifiOff className="size-3.5" /> : <Wifi className="size-3.5" />}
@@ -266,7 +266,7 @@ export function PosShell() {
               <p className="app-top-label">{t("current_sale")}</p>
               <h2 className="mt-1 text-xl font-semibold text-[var(--foreground)]">{cartLines.length} {t("items")}</h2>
             </div>
-            <div className="rounded-full bg-[color-mix(in_srgb,var(--action)_14%,var(--surface))] p-3 text-[var(--action)]">
+            <div className="p-3 bg-[color-mix(in_srgb,var(--action)_14%,var(--surface))] text-[var(--action)]">
               <ShoppingBag className="size-5" />
             </div>
           </div>
@@ -274,7 +274,7 @@ export function PosShell() {
           <div className="mt-4 space-y-3">
             {cartLines.length ? (
               cartLines.map((line) => (
-                <div key={line.productId} className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] p-3">
+                <div key={line.productId} className="app-card-inset p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-[var(--foreground)]">{line.product.name}</p>
@@ -304,7 +304,7 @@ export function PosShell() {
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-dashed border-[var(--border-soft)] px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
+              <div className="app-card-inset border-dashed px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
                 {t("select_products_pos")}
               </div>
             )}
@@ -325,15 +325,15 @@ export function PosShell() {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-[var(--surface-quiet)] p-1">
+          <div className="mt-5 grid grid-cols-2 gap-2 bg-[var(--surface-quiet)] p-1">
             {["cash", "card"].map((method) => (
               <button
                 key={method}
                 type="button"
                 onClick={() => setPaymentMethod(method)}
                 className={cn(
-                  "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold capitalize",
-                  paymentMethod === method && "bg-[var(--surface)] shadow-[var(--shadow-soft)]",
+                  "inline-flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold capitalize",
+                  paymentMethod === method && "bg-[var(--surface)] shadow-[var(--shadow-soft)] border-[var(--outline-variant)]",
                 )}
               >
                 <Banknote className="size-4" />
@@ -357,12 +357,12 @@ export function PosShell() {
             </div>
           ) : null}
 
-          {notice ? <div className="mt-4 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-quiet)] px-4 py-3 text-sm text-[var(--foreground)]">{notice}</div> : null}
+          {notice ? <div className="mt-4 app-card-inset p-3 text-sm text-[var(--foreground)]">{notice}</div> : null}
 
           <button
             type="button"
             onClick={completeSale}
-            className="mt-5 w-full rounded-xl bg-[var(--action)] px-4 py-3 text-sm font-semibold text-[var(--action-foreground)]"
+            className="mt-5 w-full app-link-button"
           >
             {t("complete_sale")}
           </button>
